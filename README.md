@@ -34,6 +34,18 @@ Flyway creates the schema (`src/main/resources/db/migration`). For production, b
 | `CORS_ORIGIN` | `*` | comma-separated origin patterns |
 | `SEED` | `true` | demo data, only inserted when the DB is empty |
 
+## Deploy (free tier: Neon + Render + Vercel)
+1. **Database:** create a PostgreSQL database on [Neon](https://neon.tech).
+2. **API:** on [Render](https://render.com), create a Web Service from this repo with root directory `backend` and the Docker runtime (`backend/Dockerfile`). Set these environment variables:
+   - `DB_URL` = `jdbc:postgresql://<neon-host>/<db>?sslmode=require`
+   - `DB_USER`, `DB_PASSWORD` from Neon
+   - `JWT_SECRET` = a random string of at least 32 characters
+   - `CORS_ORIGIN` = your Vercel URL
+   - `SEED` = `true` to load the demo shops, `false` for a real launch
+
+   Render sets `PORT`, and Flyway creates the tables on first start.
+3. **UI:** on [Vercel](https://vercel.com), import this repo with root directory `frontend` and set `VITE_API_URL` = `https://<render-app>.onrender.com/api`. `frontend/vercel.json` makes page refreshes on routes like `/shop/:id` work.
+
 ## Tests
 ```bash
 cd backend && ./mvnw test
