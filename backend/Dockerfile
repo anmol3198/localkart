@@ -1,5 +1,5 @@
 # Build stage: compile the Spring Boot jar (tests run separately with ./mvnw test).
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /app
 COPY pom.xml .
 RUN mvn -q -B dependency:go-offline
