@@ -3,6 +3,7 @@
 Local shops register and list their inventory. Customers see shops within **5 km**, check what's in stock, and **call (or WhatsApp) the shop to order**. Each shop decides whether it offers home delivery, its delivery radius (up to 5 km), the minimum order and the delivery charge.
 
 ## Stack
+- **mobile/**: Expo (React Native) app for customers and shop owners. See `mobile/README.md`.
 - **backend/**: Java 21, Spring Boot 4.1, Spring Data JPA, PostgreSQL, Flyway, Spring Security (stateless JWT, HS256), Bean Validation
 - **frontend/**: React + Vite + MUI, Leaflet/OpenStreetMap maps (no API key needed)
 
