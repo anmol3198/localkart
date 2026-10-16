@@ -18,6 +18,7 @@ export const API_URL = resolveBaseUrl()
 
 let token = null
 export const setApiToken = (t) => { token = t }
+export const getApiToken = () => token
 
 export class ApiError extends Error {
   constructor(message, status) {

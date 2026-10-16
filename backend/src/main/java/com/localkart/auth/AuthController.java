@@ -29,7 +29,7 @@ public class AuthController {
 	}
 
 	@PostMapping("/login")
-	public AuthResponse login(@RequestBody LoginRequest req) {
+	public AuthResponse login(@jakarta.validation.Valid @RequestBody LoginRequest req) {
 		return authService.login(req);
 	}
 }

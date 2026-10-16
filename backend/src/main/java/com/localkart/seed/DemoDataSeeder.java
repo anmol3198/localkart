@@ -9,6 +9,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import com.localkart.shop.ShopRepository;
  * Demo vendor login: shop1@demo.local / demo1234.
  */
 @Component
+@Order(1)
 @ConditionalOnProperty(name = "localkart.seed.enabled", havingValue = "true")
 public class DemoDataSeeder implements ApplicationRunner {
 

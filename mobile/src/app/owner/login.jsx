@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth.jsx'
 import { useToast } from '../../lib/toast.jsx'
 import { colors, type } from '../../lib/theme.js'
 import { Banner, Button, Field, PasswordField } from '../../components/ui.jsx'
+import { isValidEmail } from '../../lib/validation.js'
 
 export default function LoginScreen() {
   const { login } = useAuth()
@@ -16,7 +17,8 @@ export default function LoginScreen() {
   const set = (key) => (v) => { setForm({ ...form, [key]: v }); setError('') }
 
   const submit = async () => {
-    if (!form.email.trim() || !form.password) return setError('Enter your email and password')
+    if (!isValidEmail(form.email.trim())) return setError('Enter a valid email, like name@gmail.com')
+    if (!form.password) return setError('Enter your password')
     setBusy(true)
     try {
       const data = await api.post('/auth/login', { email: form.email.trim(), password: form.password })

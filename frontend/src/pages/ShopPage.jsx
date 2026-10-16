@@ -21,6 +21,8 @@ import { directionsUrl, formatDistance, useCustomerLocation } from '../lib/locat
 import { categoryStyle } from '../lib/categories.jsx'
 import { useNotify } from '../lib/notify.jsx'
 import useTitle from '../lib/useTitle.js'
+import { track } from '../lib/track.js'
+import { formatPhone } from '../lib/validation.js'
 import DeliveryChip from '../components/DeliveryChip.jsx'
 import CallButtons from '../components/CallButtons.jsx'
 import CategoryAvatar from '../components/CategoryAvatar.jsx'
@@ -58,6 +60,9 @@ export default function ShopPage() {
   const [filter, setFilter] = useState('')
   const [inStockOnly, setInStockOnly] = useState(false)
   useTitle(data?.shop.shopName)
+
+  // One view per visit; the API also ignores repeats from the same device for 30 minutes.
+  useEffect(() => { track(id, 'VIEW') }, [id])
 
   useEffect(() => {
     api.get(`/shops/${id}`, { params: location || {} })
@@ -137,11 +142,11 @@ export default function ShopPage() {
             <CallButtons shop={shop} fullWidth />
           </Box>
           <InfoRow icon={<PhoneIcon fontSize="small" />} action={<Tooltip title="Copy number"><IconButton size="small" onClick={copyPhone}><ContentCopyIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Typography sx={{ fontWeight: 600 }}>{shop.phone}</Typography>
-            {shop.alternatePhone && <Typography variant="body2" color="text.secondary">Alt: {shop.alternatePhone}</Typography>}
+            <Typography sx={{ fontWeight: 600 }}>{formatPhone(shop.phone)}</Typography>
+            {shop.alternatePhone && <Typography variant="body2" color="text.secondary">Alt: {formatPhone(shop.alternatePhone)}</Typography>}
           </InfoRow>
           <Divider />
-          <InfoRow icon={<PlaceIcon fontSize="small" />} action={<Button size="small" startIcon={<DirectionsIcon />} href={directionsUrl(lat, lng)} target="_blank" rel="noreferrer">Directions</Button>}>
+          <InfoRow icon={<PlaceIcon fontSize="small" />} action={<Button size="small" startIcon={<DirectionsIcon />} href={directionsUrl(lat, lng)} target="_blank" rel="noreferrer" onClick={() => track(shop._id, 'DIRECTIONS')}>Directions</Button>}>
             <Typography variant="body2">{shop.address}</Typography>
           </InfoRow>
           <Divider />

@@ -130,6 +130,9 @@ public class ShopService {
 			shop.setLatitude(req.getLat());
 			shop.setLongitude(req.getLng());
 		}
+		if (shop.getAlternatePhone() != null && shop.getAlternatePhone().equals(shop.getPhone())) {
+			throw ApiException.badRequest("Alternate phone must be different from the main phone");
+		}
 	}
 
 	private static String blankToNull(String s) {

@@ -38,6 +38,12 @@ public class VendorProductController {
 		return productService.list(shopId(jwt)).stream().map(ProductView::of).toList();
 	}
 
+	/** Scan-to-find: the item in this shop with that barcode, or 404. */
+	@GetMapping("/barcode/{code}")
+	public ProductView byBarcode(@AuthenticationPrincipal Jwt jwt, @PathVariable String code) {
+		return ProductView.of(productService.byBarcode(shopId(jwt), code));
+	}
+
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public ProductView create(@AuthenticationPrincipal Jwt jwt,

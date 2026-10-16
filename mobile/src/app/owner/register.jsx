@@ -6,7 +6,8 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import api from '../../lib/api.js'
 import { useAuth } from '../../lib/auth.jsx'
 import { useToast } from '../../lib/toast.jsx'
-import { EMAIL, emptyShop, validateShop } from '../../lib/shop.js'
+import { cleanShop, emptyShop, validateShop } from '../../lib/shop.js'
+import { EMAIL_MSG, NAME_MSG, PASSWORD_MSG, emailSuggestion, isValidEmail, isValidName, isValidPassword, passwordStrength } from '../../lib/validation.js'
 import { colors, type } from '../../lib/theme.js'
 import { Banner, Button, Field, PasswordField, Section } from '../../components/ui.jsx'
 import ShopForm from '../../components/ShopForm.jsx'
@@ -14,11 +15,16 @@ import ShopForm from '../../components/ShopForm.jsx'
 const STEPS = ['Account', 'Shop', 'Location', 'Delivery']
 const SECTIONS = [null, ['details'], ['location'], ['delivery']]
 
+const STRENGTH_COLOR = [colors.danger, colors.danger, colors.warning, colors.success, colors.success]
+
 function validateAccount(a) {
   const e = {}
   if (!a.ownerName.trim()) e.ownerName = 'Your name is required'
-  if (!EMAIL.test(a.email.trim())) e.email = 'Enter a valid email'
-  if (a.password.length < 6) e.password = 'Use at least 6 characters'
+  else if (!isValidName(a.ownerName)) e.ownerName = NAME_MSG
+  if (!a.email.trim()) e.email = 'Email is required'
+  else if (!isValidEmail(a.email.trim())) e.email = EMAIL_MSG
+  if (!a.password) e.password = 'Password is required'
+  else if (!isValidPassword(a.password)) e.password = PASSWORD_MSG
   return e
 }
 
@@ -57,7 +63,13 @@ export default function RegisterScreen() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const last = step === STEPS.length - 1
+  const [touched, setTouched] = useState({})
   const setAcc = (key) => (v) => setAccount({ ...account, [key]: v })
+  const liveAccount = validateAccount(account)
+  const accErr = (key) => errors[key] || (touched[key] ? liveAccount[key] : undefined)
+  const touch = (key) => () => setTouched((t) => ({ ...t, [key]: true }))
+  const suggestion = isValidEmail(account.email.trim()) ? emailSuggestion(account.email.trim()) : null
+  const strength = passwordStrength(account.password)
   const toTop = () => scroll.current?.scrollTo({ y: 0, animated: true })
 
   const next = async () => {
@@ -68,7 +80,7 @@ export default function RegisterScreen() {
     setBusy(true)
     setError('')
     try {
-      const data = await api.post('/auth/register', { ...account, email: account.email.trim(), ...shop })
+      const data = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop) })
       await login(data.token)
       notify('Your shop is live! Now add the items you sell.')
       router.dismissTo('/owner')
@@ -93,9 +105,22 @@ export default function RegisterScreen() {
         {error ? <Banner kind="error">{error}</Banner> : null}
         {step === 0 && (
           <Section icon="person-outline" title="Owner account" subtitle="You'll use this email and password to log in">
-            <Field label="Your name" required value={account.ownerName} onChangeText={setAcc('ownerName')} autoComplete="name" error={errors.ownerName} />
-            <Field label="Email" required value={account.email} onChangeText={setAcc('email')} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email} />
-            <PasswordField label="Password" required value={account.password} onChangeText={setAcc('password')} autoComplete="new-password" error={errors.password} hint="At least 6 characters" />
+            <Field label="Your name" required value={account.ownerName} onChangeText={setAcc('ownerName')} onBlur={touch('ownerName')} autoComplete="name" error={accErr('ownerName')} />
+            <Field label="Email" required value={account.email} onChangeText={setAcc('email')} onBlur={touch('email')} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" error={accErr('email')} />
+            {suggestion && (
+              <Banner kind="warning" action={<Text onPress={() => setAccount({ ...account, email: suggestion })} style={{ color: colors.warning, fontWeight: '800' }}>Use it</Text>}>
+                Did you mean {suggestion}?
+              </Banner>
+            )}
+            <PasswordField label="Password" required value={account.password} onChangeText={setAcc('password')} onBlur={touch('password')} autoComplete="new-password" error={accErr('password')} hint="At least 8 characters, with letters and numbers" />
+            {account.password ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.max(8, (strength.score / 4) * 100)}%`, height: '100%', backgroundColor: STRENGTH_COLOR[strength.score] }} />
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: STRENGTH_COLOR[strength.score], minWidth: 60 }}>{strength.label}</Text>
+              </View>
+            ) : null}
           </Section>
         )}
         {step > 0 && <ShopForm value={shop} onChange={setShop} errors={errors} sections={SECTIONS[step]} />}

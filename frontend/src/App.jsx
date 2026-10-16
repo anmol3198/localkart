@@ -11,6 +11,7 @@ import ShopPage from './pages/ShopPage.jsx'
 import VendorLogin from './pages/VendorLogin.jsx'
 import VendorRegister from './pages/VendorRegister.jsx'
 import VendorDashboard from './pages/VendorDashboard.jsx'
+import VendorPoster from './pages/VendorPoster.jsx'
 import { useAuth } from './lib/auth.jsx'
 
 function VendorOnly({ children }) {
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/vendor/login" element={<GuestOnly><VendorLogin /></GuestOnly>} />
             <Route path="/vendor/register" element={<GuestOnly><VendorRegister /></GuestOnly>} />
             <Route path="/vendor" element={<VendorOnly><VendorDashboard /></VendorOnly>} />
+            <Route path="/vendor/poster" element={<VendorOnly><VendorPoster /></VendorOnly>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Container>

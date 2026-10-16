@@ -77,7 +77,7 @@ export function Chip({ label, selected, onPress, icon, iconSet: IconSet = Ionico
   )
 }
 
-export const Field = forwardRef(function Field({ label, error, hint, prefix, right, multiline, style, required, ...props }, ref) {
+export const Field = forwardRef(function Field({ label, error, hint, prefix, right, multiline, style, required, onFocus, onBlur, ...props }, ref) {
   const [focused, setFocused] = useState(false)
   return (
     <View style={[{ gap: 6 }, style]}>
@@ -90,8 +90,8 @@ export const Field = forwardRef(function Field({ label, error, hint, prefix, rig
           placeholderTextColor={colors.textFaint}
           style={[styles.input, multiline && { textAlignVertical: 'top' }]}
           multiline={multiline}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={(e) => { setFocused(true); onFocus?.(e) }}
+          onBlur={(e) => { setFocused(false); onBlur?.(e) }}
           {...props}
         />
         {right}

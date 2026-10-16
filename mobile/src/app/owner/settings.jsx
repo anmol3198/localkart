@@ -4,7 +4,7 @@ import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import api from '../../lib/api.js'
 import { useToast } from '../../lib/toast.jsx'
-import { shopToForm, validateShop } from '../../lib/shop.js'
+import { cleanShop, shopToForm, validateShop } from '../../lib/shop.js'
 import { colors } from '../../lib/theme.js'
 import { Banner, Button } from '../../components/ui.jsx'
 import ShopForm from '../../components/ShopForm.jsx'
@@ -30,7 +30,7 @@ export default function SettingsScreen() {
     if (Object.keys(found).length) return notify('Please fix the highlighted fields', 'error')
     setBusy(true)
     try {
-      const saved = shopToForm(await api.put('/vendor/shop', { ...form, minOrderAmount: Number(form.minOrderAmount) || 0, deliveryCharge: Number(form.deliveryCharge) || 0 }))
+      const saved = shopToForm(await api.put('/vendor/shop', cleanShop(form)))
       setInitial(saved)
       setForm(saved)
       setError('')

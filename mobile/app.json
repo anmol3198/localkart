@@ -46,6 +46,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LocalKart uses the camera to scan barcodes on the products in your shop.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "scheme": "localkart",

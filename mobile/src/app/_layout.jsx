@@ -32,6 +32,9 @@ export default function RootLayout() {
                 <Stack.Screen name="owner/register" options={{ title: 'Register your shop' }} />
                 <Stack.Screen name="owner/item" options={{ title: 'Item', presentation: 'modal' }} />
                 <Stack.Screen name="owner/settings" options={{ title: 'Shop settings' }} />
+                <Stack.Screen name="owner/insights" options={{ title: 'Insights' }} />
+                <Stack.Screen name="owner/scan" options={{ title: 'Scan items' }} />
+                <Stack.Screen name="owner/poster" options={{ title: 'QR poster' }} />
               </Stack>
             </ToastProvider>
           </NearbyProvider>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
-import { Alert, Box, Button, CircularProgress, Link, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, CircularProgress, LinearProgress, Link, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material'
 import PersonIcon from '@mui/icons-material/Person'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
@@ -9,20 +9,24 @@ import api, { errorMessage } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useNotify } from '../lib/notify.jsx'
 import useTitle from '../lib/useTitle.js'
-import ShopForm, { emptyShop, validateShop } from '../components/ShopForm.jsx'
+import ShopForm, { cleanShop, emptyShop, validateShop } from '../components/ShopForm.jsx'
+import { EMAIL_MSG, NAME_MSG, PASSWORD_MSG, emailSuggestion, isValidEmail, isValidName, isValidPassword, passwordStrength } from '../lib/validation.js'
 import AuthLayout from '../components/AuthLayout.jsx'
 import FormSection from '../components/FormSection.jsx'
 import PasswordField from '../components/PasswordField.jsx'
 
 const STEPS = ['Your account', 'Shop details', 'Location', 'Delivery']
 const SECTIONS = [null, ['details'], ['location'], ['delivery']]
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const STRENGTH_COLOR = ['error', 'error', 'warning', 'success', 'success']
 
 function validateAccount(a) {
   const e = {}
   if (!a.ownerName.trim()) e.ownerName = 'Your name is required'
-  if (!EMAIL.test(a.email)) e.email = 'Enter a valid email'
-  if (a.password.length < 6) e.password = 'Use at least 6 characters'
+  else if (!isValidName(a.ownerName)) e.ownerName = NAME_MSG
+  if (!a.email.trim()) e.email = 'Email is required'
+  else if (!isValidEmail(a.email.trim())) e.email = EMAIL_MSG
+  if (!a.password) e.password = 'Password is required'
+  else if (!isValidPassword(a.password)) e.password = PASSWORD_MSG
   return e
 }
 
@@ -37,8 +41,13 @@ export default function VendorRegister() {
   const [errors, setErrors] = useState({})
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [touched, setTouched] = useState({})
   const setAcc = (key) => (e) => setAccount({ ...account, [key]: e.target.value })
-  const err = (key) => ({ error: Boolean(errors[key]), helperText: errors[key] })
+  const liveAccount = validateAccount(account)
+  const accErr = (key) => errors[key] || (touched[key] ? liveAccount[key] : undefined)
+  const err = (key) => ({ error: Boolean(accErr(key)), helperText: accErr(key), onBlur: () => setTouched((t) => ({ ...t, [key]: true })) })
+  const suggestion = isValidEmail(account.email.trim()) ? emailSuggestion(account.email.trim()) : null
+  const strength = passwordStrength(account.password)
   const last = step === STEPS.length - 1
 
   const validate = (s) => (s === 0 ? validateAccount(account) : validateShop(shop, SECTIONS[s]))
@@ -56,7 +65,7 @@ export default function VendorRegister() {
     setBusy(true)
     setError('')
     try {
-      const { data } = await api.post('/auth/register', { ...account, ...shop })
+      const { data } = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop) })
       login(data.token)
       notify('Your shop is live! Now add the items you sell.')
       navigate('/vendor')
@@ -92,8 +101,24 @@ export default function VendorRegister() {
             <FormSection icon={<PersonIcon />} title="Owner account" subtitle="You'll use this email and password to log in">
               <Stack spacing={2}>
                 <TextField label="Your name" required autoComplete="name" autoFocus value={account.ownerName} onChange={setAcc('ownerName')} {...err('ownerName')} />
-                <TextField label="Email" type="email" required autoComplete="email" value={account.email} onChange={setAcc('email')} {...err('email')} />
-                <PasswordField label="Password" required autoComplete="new-password" value={account.password} onChange={setAcc('password')} {...err('password')} helperText={errors.password || 'At least 6 characters'} />
+                <Box>
+                  <TextField label="Email" type="email" required fullWidth autoComplete="email" value={account.email} onChange={setAcc('email')} {...err('email')} />
+                  {suggestion && (
+                    <Alert severity="warning" sx={{ mt: 1 }} action={<Button color="inherit" size="small" onClick={() => setAccount({ ...account, email: suggestion })}>Use it</Button>}>
+                      Did you mean <b>{suggestion}</b>?
+                    </Alert>
+                  )}
+                </Box>
+                <Box>
+                  <PasswordField label="Password" required fullWidth autoComplete="new-password" value={account.password} onChange={setAcc('password')} {...err('password')}
+                    helperText={accErr('password') || 'At least 8 characters, with letters and numbers'} />
+                  {account.password && (
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 1, px: 0.5 }}>
+                      <LinearProgress variant="determinate" value={(strength.score / 4) * 100} color={STRENGTH_COLOR[strength.score]} sx={{ flex: 1, height: 6, borderRadius: 3 }} />
+                      <Typography variant="caption" sx={{ fontWeight: 700, minWidth: 64, color: `${STRENGTH_COLOR[strength.score]}.main` }}>{strength.label}</Typography>
+                    </Stack>
+                  )}
+                </Box>
               </Stack>
             </FormSection>
           )}

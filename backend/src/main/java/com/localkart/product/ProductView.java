@@ -15,11 +15,12 @@ public record ProductView(
 		String unit,
 		boolean inStock,
 		String description,
+		String barcode,
 		Instant createdAt,
 		Instant updatedAt) {
 
 	public static ProductView of(Product p) {
 		return new ProductView(p.getId(), p.getShopId(), p.getName(), p.getCategory(), p.getPrice(), p.getUnit(),
-				p.isInStock(), p.getDescription(), p.getCreatedAt(), p.getUpdatedAt());
+				p.isInStock(), p.getDescription(), p.getBarcode(), p.getCreatedAt(), p.getUpdatedAt());
 	}
 }

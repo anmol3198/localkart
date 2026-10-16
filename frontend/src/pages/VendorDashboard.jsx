@@ -18,17 +18,26 @@ import CategoryIcon from '@mui/icons-material/Category'
 import StorefrontIcon from '@mui/icons-material/Storefront'
 import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import SettingsIcon from '@mui/icons-material/Settings'
+import QrCode2Icon from '@mui/icons-material/QrCode2'
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner'
+import TravelExploreIcon from '@mui/icons-material/TravelExplore'
+import InsightsIcon from '@mui/icons-material/Insights'
 import api, { errorMessage } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useNotify } from '../lib/notify.jsx'
 import useTitle from '../lib/useTitle.js'
-import ShopForm, { validateShop } from '../components/ShopForm.jsx'
+import ShopForm, { cleanShop, validateShop } from '../components/ShopForm.jsx'
+import { hasRealText, moneyError } from '../lib/validation.js'
 import CategoryAvatar from '../components/CategoryAvatar.jsx'
 import OpenBadge from '../components/OpenBadge.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import Insights from '../components/Insights.jsx'
 
-const emptyProduct = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '' }
+const emptyProduct = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '', barcode: '' }
+const CODE = /^[0-9A-Za-z-]{4,32}$/
+const cleanCode = (s) => (s || '').replace(/\s/g, '')
+const isRetailCode = (s) => /^\d{8}$|^\d{12,14}$/.test(s)
 const UNITS = ['piece', 'kg', '500 g', '250 g', '100 g', 'litre', '500 ml', 'pack', 'dozen', 'box', 'strip', 'bottle', 'packet']
 
 function ProductDialog({ open, initial, categories, onClose, onSave }) {
@@ -38,21 +47,52 @@ function ProductDialog({ open, initial, categories, onClose, onSave }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
+  const [codeError, setCodeError] = useState('')
+  const [lookup, setLookup] = useState({ busy: false, note: '' })
   const isNew = !initial?._id
-  useEffect(() => { if (open) { setForm({ ...emptyProduct, ...initial }); setError(''); setNameError('') } }, [open, initial])
+  useEffect(() => {
+    if (!open) return
+    setForm({ ...emptyProduct, ...initial, barcode: initial?.barcode || '' })
+    setError(''); setNameError(''); setCodeError(''); setLookup({ busy: false, note: '' })
+  }, [open, initial])
+
+  /** Fill name/section/size from the product database (Open Food Facts) for a retail barcode. */
+  const runLookup = useCallback(async (code) => {
+    setLookup({ busy: true, note: '' })
+    try {
+      const { data } = await api.get(`/vendor/barcode-lookup/${encodeURIComponent(code)}`)
+      setForm((f) => ({ ...f, name: f.name || data.name, category: f.category || data.section || '', description: f.description || data.quantity || '' }))
+      setLookup({ busy: false, note: `Found "${data.name}". Check it and add your price.` })
+    } catch (e) {
+      setLookup({ busy: false, note: e.response?.status === 404 ? errorMessage(e) : 'Could not look this barcode up right now. Type the name instead.' })
+    }
+  }, [])
+
+  // Opened from a barcode search for a new product: look the name up straight away.
+  useEffect(() => {
+    if (open && isNew && initial?.barcode && initial?.autoLookup) runLookup(initial.barcode)
+  }, [open, isNew, initial, runLookup])
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
   const save = async (addAnother) => {
     if (!form.name.trim()) return setNameError('Item name is required')
-    if (form.price === '' || Number(form.price) < 0) return setError('Enter a price of ₹0 or more')
+    if (!hasRealText(form.name, 2, 150)) return setNameError('Item name must be 2-150 characters')
+    if (form.price === '') return setError('Enter a price (₹0 or more)')
+    const priceError = moneyError(form.price, 'Price', 1000000)
+    if (priceError) return setError(priceError)
+    const code = cleanCode(form.barcode)
+    if (code && !CODE.test(code)) return setCodeError('Use 4-32 letters, numbers or dashes')
     setBusy(true)
     try {
-      await onSave({ ...form, name: form.name.trim(), price: Number(form.price), category: form.category.trim() || 'General', unit: form.unit.trim() || 'piece' })
+      const { autoLookup: _ignored, ...rest } = form
+      await onSave({ ...rest, barcode: cleanCode(form.barcode), name: form.name.trim(), price: Number(form.price), category: form.category.trim() || 'General', unit: form.unit.trim() || 'piece' })
       if (addAnother) setForm({ ...emptyProduct, category: form.category, unit: form.unit })
       else onClose()
       setError('')
     } catch (err) {
-      setError(errorMessage(err))
+      const msg = errorMessage(err)
+      if (/barcode/i.test(msg)) setCodeError(msg)
+      else setError(msg)
     } finally {
       setBusy(false)
     }
@@ -87,6 +127,25 @@ function ProductDialog({ open, initial, categories, onClose, onSave }) {
               renderInput={(params) => <TextField {...params} label="Section" helperText="Groups items on your shop page, e.g. Dairy, Staples, Snacks" />}
             />
             <TextField label="Short description (optional)" value={form.description || ''} onChange={set('description')} placeholder="Brand, size, variety…" slotProps={{ htmlInput: { maxLength: 300 } }} />
+            <TextField
+              label="Barcode (optional)"
+              value={form.barcode}
+              onChange={(e) => { setForm({ ...form, barcode: e.target.value.replace(/[^0-9A-Za-z\- ]/g, '') }); setCodeError(''); setLookup({ busy: false, note: '' }) }}
+              placeholder="Scan or type the code on the pack"
+              error={Boolean(codeError)}
+              helperText={codeError || lookup.note || 'Lets you find this item by scanning it. USB barcode scanners work here.'}
+              slotProps={{
+                htmlInput: { maxLength: 40, inputMode: 'numeric' },
+                input: {
+                  startAdornment: <InputAdornment position="start"><QrCodeScannerIcon fontSize="small" /></InputAdornment>,
+                  endAdornment: isRetailCode(cleanCode(form.barcode)) && (
+                    <Button size="small" startIcon={lookup.busy ? <CircularProgress size={14} /> : <TravelExploreIcon />} disabled={lookup.busy} onClick={() => runLookup(cleanCode(form.barcode))} sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      Look up
+                    </Button>
+                  ),
+                },
+              }}
+            />
             <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box>
                 <Typography sx={{ fontWeight: 600 }}>{form.inStock ? 'In stock' : 'Out of stock'}</Typography>
@@ -141,6 +200,7 @@ function Inventory({ products, setProducts, reload, notify }) {
   const [stock, setStock] = useState('all')
   const [editing, setEditing] = useState(null) // null = closed, {} = new
   const [deleting, setDeleting] = useState(null)
+  const [missingCode, setMissingCode] = useState(null)
 
   const categories = useMemo(() => [...new Set(products.map((p) => p.category))].sort(), [products])
 
@@ -177,11 +237,32 @@ function Inventory({ products, setProducts, reload, notify }) {
   const visible = useMemo(() => {
     const f = filter.trim().toLowerCase()
     return products
-      .filter((p) => !f || p.name.toLowerCase().includes(f) || p.category.toLowerCase().includes(f))
+      .filter((p) => !f || p.name.toLowerCase().includes(f) || p.category.toLowerCase().includes(f) || (p.barcode || '').toLowerCase().includes(cleanCode(f)))
       .filter((p) => stock === 'all' || (stock === 'in') === p.inStock)
   }, [products, filter, stock])
 
   const outCount = products.filter((p) => !p.inStock).length
+
+  /** Enter in the search box (what USB barcode scanners send): open the scanned item, or offer to add it. */
+  const onSearchKey = (e) => {
+    if (e.key !== 'Enter') return
+    const code = cleanCode(filter).toUpperCase()
+    if (!CODE.test(code) || !/\d/.test(code)) return
+    e.preventDefault()
+    const hit = products.find((p) => (p.barcode || '').toUpperCase() === code)
+    if (hit) {
+      setFilter('')
+      setMissingCode(null)
+      setEditing(hit)
+    } else {
+      setMissingCode(code)
+    }
+  }
+  const addMissing = () => {
+    setEditing({ barcode: missingCode, autoLookup: isRetailCode(missingCode) })
+    setMissingCode(null)
+    setFilter('')
+  }
 
   if (products.length === 0) {
     return (
@@ -203,7 +284,7 @@ function Inventory({ products, setProducts, reload, notify }) {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
         <Stack direction="row" spacing={1} sx={{ flex: 1, alignItems: 'center' }}>
           <TextField
-            size="small" placeholder="Search items or sections" value={filter} onChange={(e) => setFilter(e.target.value)} sx={{ flex: 1, maxWidth: { sm: 320 } }}
+            size="small" placeholder="Search, or scan a barcode" value={filter} onChange={(e) => { setFilter(e.target.value); setMissingCode(null) }} onKeyDown={onSearchKey} sx={{ flex: 1, maxWidth: { sm: 320 } }}
             slotProps={{
               input: {
                 startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
@@ -219,7 +300,13 @@ function Inventory({ products, setProducts, reload, notify }) {
         </Stack>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({})}>Add item</Button>
       </Stack>
-      <Typography variant="body2" color="text.secondary">Tip: flip the stock switch whenever something runs out — customers see it instantly.</Typography>
+      {missingCode && (
+        <Alert severity="info" icon={<QrCodeScannerIcon />} onClose={() => setMissingCode(null)}
+          action={<Button color="inherit" size="small" startIcon={<AddIcon />} onClick={addMissing}>Add it</Button>}>
+          No item with barcode <b>{missingCode}</b> in your shop yet.
+        </Alert>
+      )}
+      <Typography variant="body2" color="text.secondary">Tip: flip the stock switch whenever something runs out. With a USB barcode scanner, scan into the search box to jump to an item.</Typography>
 
       {visible.length === 0 ? (
         <Card><EmptyState icon={<SearchIcon />} title="No items match" action={<Button onClick={() => { setFilter(''); setStock('all') }}>Show all items</Button>} /></Card>
@@ -254,6 +341,11 @@ function Inventory({ products, setProducts, reload, notify }) {
                 <TableRow key={p._id} hover sx={{ '& td': { color: p.inStock ? 'text.primary' : 'text.secondary' } }}>
                   <TableCell>
                     <Typography sx={{ fontWeight: 600 }}>{p.name}</Typography>
+                    {p.barcode && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontFamily: 'ui-monospace, monospace' }}>
+                        <QrCodeScannerIcon sx={{ fontSize: 14 }} />{p.barcode}
+                      </Typography>
+                    )}
                     {p.description && <Typography variant="body2" color="text.secondary">{p.description}</Typography>}
                   </TableCell>
                   <TableCell><Chip size="small" label={p.category} variant="outlined" /></TableCell>
@@ -295,7 +387,7 @@ function Settings({ shop, onSaved, notify }) {
     if (Object.keys(found).length) return notify('Please fix the highlighted fields', 'error')
     setBusy(true)
     try {
-      const { data } = await api.put('/vendor/shop', form)
+      const { data } = await api.put('/vendor/shop', cleanShop(form))
       onSaved(data)
       setError('')
       notify('Shop details saved')
@@ -390,9 +482,10 @@ export default function VendorDashboard() {
               </Stack>
             </Box>
           </Stack>
-          <Button variant="outlined" startIcon={<VisibilityIcon />} component={RouterLink} to={`/shop/${shop._id}`} sx={{ alignSelf: { xs: 'stretch', md: 'center' }, flexShrink: 0 }}>
-            See what customers see
-          </Button>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignSelf: { xs: 'stretch', md: 'center' }, flexShrink: 0 }}>
+            <Button variant="outlined" startIcon={<QrCode2Icon />} component={RouterLink} to="/vendor/poster">QR poster</Button>
+            <Button variant="outlined" startIcon={<VisibilityIcon />} component={RouterLink} to={`/shop/${shop._id}`}>See what customers see</Button>
+          </Stack>
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2.5 }}>
           <QuickToggle
@@ -414,13 +507,15 @@ export default function VendorDashboard() {
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={tab} onChange={(_e, v) => setTab(v)}>
+        <Tabs value={tab} onChange={(_e, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
           <Tab icon={<Inventory2Icon fontSize="small" />} iconPosition="start" label="Inventory" />
+          <Tab icon={<InsightsIcon fontSize="small" />} iconPosition="start" label="Insights" />
           <Tab icon={<SettingsIcon fontSize="small" />} iconPosition="start" label="Shop settings" />
         </Tabs>
       </Box>
       {tab === 0 && (products ? <Inventory products={products} setProducts={setProducts} reload={loadProducts} notify={notify} /> : <Skeleton variant="rounded" height={300} />)}
-      {tab === 1 && <Settings key={shop.updatedAt} shop={shop} onSaved={setShop} notify={notify} />}
+      {tab === 1 && <Insights shop={shop} />}
+      {tab === 2 && <Settings key={shop.updatedAt} shop={shop} onSaved={setShop} notify={notify} />}
     </Stack>
   )
 }

@@ -6,13 +6,15 @@ import api from '../../lib/api.js'
 import { useToast } from '../../lib/toast.jsx'
 import { confirm } from '../../lib/confirm.js'
 import { colors } from '../../lib/theme.js'
+import { hasRealText, moneyError } from '../../lib/validation.js'
 import { Banner, Button, Chip, Field, SwitchRow } from '../../components/ui.jsx'
 
 const UNITS = ['piece', 'kg', '500 g', '250 g', 'litre', '500 ml', 'pack', 'dozen', 'box', 'strip', 'bottle']
-const empty = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '' }
+const empty = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '', barcode: '' }
+const BARCODE = /^[0-9A-Za-z-]{4,32}$/
 
 export default function ItemScreen() {
-  const { id } = useLocalSearchParams()
+  const { id, barcode: scanned, name: suggestedName, section: suggestedSection, description: suggestedDesc, fromScan } = useLocalSearchParams()
   const insets = useSafeAreaInsets()
   const notify = useToast()
   const [form, setForm] = useState(empty)
@@ -28,22 +30,27 @@ export default function ItemScreen() {
     api.get('/vendor/products').then((list) => {
       setAll(list)
       const found = id && list.find((p) => p._id === id)
-      if (found) setForm({ ...empty, ...found, price: String(found.price), description: found.description || '' })
+      if (found) setForm({ ...empty, ...found, price: String(found.price), description: found.description || '', barcode: found.barcode || '' })
       else if (id) setError('This item no longer exists.')
+      // Opened from the scanner for a new product: pre-fill what we know.
+      else if (scanned) setForm({ ...empty, barcode: scanned, name: suggestedName || '', category: suggestedSection || '', description: suggestedDesc || '' })
     }).catch((e) => setError(e.message)).finally(() => setLoading(false))
-  }, [id])
+  }, [id, scanned, suggestedName, suggestedSection, suggestedDesc])
 
   const sections = useMemo(() => [...new Set(all.map((p) => p.category))].sort(), [all])
 
   const save = async (addAnother) => {
     const e = {}
     if (!form.name.trim()) e.name = 'Item name is required'
-    if (form.price === '' || Number.isNaN(Number(form.price)) || Number(form.price) < 0) e.price = 'Enter a price of ₹0 or more'
+    else if (!hasRealText(form.name, 2, 150)) e.name = 'Item name must be 2-150 characters'
+    if (form.price === '') e.price = 'Enter a price (₹0 or more)'
+    else if (moneyError(form.price, 'Price', 1000000)) e.price = moneyError(form.price, 'Price', 1000000)
+    if (form.barcode && !BARCODE.test(form.barcode.replace(/\s/g, ''))) e.barcode = 'Use 4-32 letters, numbers or dashes'
     setErrors(e)
     if (Object.keys(e).length) return
     setBusy(true)
     setError('')
-    const body = { name: form.name.trim(), price: Number(form.price), unit: form.unit.trim() || 'piece', category: form.category.trim() || 'General', description: form.description.trim(), inStock: form.inStock }
+    const body = { name: form.name.trim(), price: Number(form.price), unit: form.unit.trim() || 'piece', category: form.category.trim() || 'General', description: form.description.trim(), inStock: form.inStock, barcode: form.barcode.replace(/\s/g, '') }
     try {
       if (isNew) await api.post('/vendor/products', body)
       else await api.put(`/vendor/products/${id}`, body)
@@ -51,11 +58,14 @@ export default function ItemScreen() {
       if (addAnother) {
         setAll((a) => [...a, body])
         setForm({ ...empty, category: form.category, unit: form.unit })
+      } else if (fromScan) {
+        router.back() // straight back to the scanner for the next product
       } else {
         router.back()
       }
     } catch (err) {
-      setError(err.message)
+      if (/barcode/i.test(err.message)) setErrors((x) => ({ ...x, barcode: err.message }))
+      else setError(err.message)
     } finally {
       setBusy(false)
     }
@@ -79,6 +89,9 @@ export default function ItemScreen() {
       <Stack.Screen options={{ title: isNew ? 'Add an item' : 'Edit item' }} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} keyboardShouldPersistTaps="handled">
         {error ? <Banner kind="error">{error}</Banner> : null}
+        {isNew && scanned ? (
+          <Banner kind="info">{suggestedName ? 'We found this product. Check the name and add your price.' : "New product. Type its name once and it's saved for the next scan."}</Banner>
+        ) : null}
         <Field label="Item name" required value={form.name} onChangeText={set('name')} placeholder="e.g. Amul Toned Milk" error={errors.name} autoFocus={isNew} />
         <Field label="Price" required prefix="₹" value={form.price} onChangeText={(t) => set('price')(t.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" error={errors.price} placeholder="0" />
         <View style={{ gap: 8 }}>
@@ -96,6 +109,9 @@ export default function ItemScreen() {
           )}
         </View>
         <Field label="Short description (optional)" value={form.description} onChangeText={set('description')} placeholder="Brand, size, variety…" maxLength={300} />
+        <Field label="Barcode (optional)" value={form.barcode} onChangeText={(t) => set('barcode')(t.replace(/[^0-9A-Za-z\- ]/g, ''))}
+          placeholder="Scan or type the code on the pack" keyboardType="number-pad" maxLength={40} error={errors.barcode}
+          hint={errors.barcode ? undefined : 'Lets you find this item later by scanning it'} />
         <SwitchRow icon="cube-outline" title={form.inStock ? 'In stock' : 'Out of stock'} subtitle="Customers see this on your shop page" value={form.inStock} onValueChange={set('inStock')} />
         {!isNew && <Button variant="ghost" icon="trash-outline" title="Delete this item" onPress={remove} style={{ alignSelf: 'center' }} />}
       </ScrollView>

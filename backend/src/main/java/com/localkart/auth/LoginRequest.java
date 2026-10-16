@@ -1,4 +1,8 @@
 package com.localkart.auth;
 
-public record LoginRequest(String email, String password) {
+import jakarta.validation.constraints.NotBlank;
+
+public record LoginRequest(
+		@NotBlank(message = "Enter your email") String email,
+		@NotBlank(message = "Enter your password") String password) {
 }

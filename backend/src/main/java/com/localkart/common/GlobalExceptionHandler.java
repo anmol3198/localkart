@@ -46,8 +46,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	ResponseEntity<ErrorResponse> handleConflict(DataIntegrityViolationException ex) {
-		log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
-		return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("Email already registered"));
+		String cause = String.valueOf(ex.getMostSpecificCause().getMessage());
+		log.warn("Data integrity violation: {}", cause);
+		// Only reached when two requests race past the service-level checks.
+		String message = cause.contains("uq_products_shop_barcode") ? "Another item already uses this barcode"
+				: "Email already registered";
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(message));
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)

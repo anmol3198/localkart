@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useNotify } from '../lib/notify.jsx'
 import useTitle from '../lib/useTitle.js'
 import AuthLayout from '../components/AuthLayout.jsx'
+import { isValidEmail } from '../lib/validation.js'
 import PasswordField from '../components/PasswordField.jsx'
 
 export default function VendorLogin() {
@@ -21,9 +22,11 @@ export default function VendorLogin() {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!isValidEmail(form.email.trim())) return setError('Enter a valid email, like name@gmail.com')
+    if (!form.password) return setError('Enter your password')
     setBusy(true)
     try {
-      const { data } = await api.post('/auth/login', form)
+      const { data } = await api.post('/auth/login', { email: form.email.trim(), password: form.password })
       login(data.token)
       notify('Welcome back!')
       navigate('/vendor')

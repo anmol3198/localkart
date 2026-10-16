@@ -9,6 +9,8 @@ import { directionsUrl, formatDistance, useCustomerLocation } from '../../lib/lo
 import { categoryStyle } from '../../lib/categories.js'
 import { colors, radius, type } from '../../lib/theme.js'
 import { useToast } from '../../lib/toast.jsx'
+import { track } from '../../lib/track.js'
+import { formatPhone } from '../../lib/validation.js'
 import { Banner, Button, Card, Chip, EmptyState, IconButton } from '../../components/ui.jsx'
 import { CallButtons, CategoryIcon, DeliveryTag, OpenBadge } from '../../components/shopBits.jsx'
 
@@ -31,6 +33,8 @@ export default function ShopScreen() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
   const [inStockOnly, setInStockOnly] = useState(false)
+
+  useEffect(() => { track(id, 'VIEW') }, [id])
 
   useEffect(() => {
     api.get(`/shops/${id}`, location || {}).then(setData).catch((e) => setError(e.message))
@@ -82,10 +86,10 @@ export default function ShopScreen() {
 
         <Card style={{ paddingVertical: 4 }}>
           <InfoRow icon="call-outline" action={<IconButton icon="copy-outline" label="Copy phone number" color={colors.primary} onPress={copyPhone} />}>
-            <Text style={{ fontWeight: '700', fontSize: 16, color: colors.text }}>{shop.phone}</Text>
-            {shop.alternatePhone ? <Text style={type.small}>Alt: {shop.alternatePhone}</Text> : null}
+            <Text style={{ fontWeight: '700', fontSize: 16, color: colors.text }}>{formatPhone(shop.phone)}</Text>
+            {shop.alternatePhone ? <Text style={type.small}>Alt: {formatPhone(shop.alternatePhone)}</Text> : null}
           </InfoRow>
-          <InfoRow icon="location-outline" action={<Button size="sm" variant="ghost" icon="navigate" title="Directions" onPress={() => Linking.openURL(directionsUrl(lat, lng))} />}>
+          <InfoRow icon="location-outline" action={<Button size="sm" variant="ghost" icon="navigate" title="Directions" onPress={() => { track(shop._id, 'DIRECTIONS'); Linking.openURL(directionsUrl(lat, lng)) }} />}>
             <Text style={type.body}>{shop.address}</Text>
           </InfoRow>
           <InfoRow icon="time-outline"><Text style={type.body}>{shop.openingHours || 'Hours not listed'}</Text></InfoRow>

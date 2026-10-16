@@ -10,6 +10,8 @@ import { confirm } from '../../lib/confirm.js'
 import { colors, radius, shadow, type } from '../../lib/theme.js'
 import { Banner, Button, Card, Chip, EmptyState, IconButton, SwitchRow } from '../../components/ui.jsx'
 import { CategoryIcon, OpenBadge } from '../../components/shopBits.jsx'
+import { Delta } from '../../components/InsightsBits.jsx'
+import { nf } from '../../lib/insights.js'
 
 const PERKS = [
   ['people-outline', 'Customers within 5 km find your shop'],
@@ -60,6 +62,7 @@ function Dashboard() {
   const notify = useToast()
   const [shop, setShop] = useState(null)
   const [products, setProducts] = useState(null)
+  const [week, setWeek] = useState(null)
   const [error, setError] = useState('')
   const [toggling, setToggling] = useState('')
   const [filter, setFilter] = useState('')
@@ -72,6 +75,8 @@ function Dashboard() {
       setShop(s)
       setProducts(p)
       setError('')
+      // Insights are a bonus here: if they fail, the dashboard still works.
+      api.get('/vendor/insights', { days: 7 }).then(setWeek).catch(() => {})
     } catch (e) {
       if (e.status === 401) { await logout(); notify('Please log in again', 'info'); return }
       setError(e.message)
@@ -126,7 +131,7 @@ function Dashboard() {
   const visible = useMemo(() => {
     const f = filter.trim().toLowerCase()
     return (products || [])
-      .filter((p) => !f || p.name.toLowerCase().includes(f) || p.category.toLowerCase().includes(f))
+      .filter((p) => !f || p.name.toLowerCase().includes(f) || p.category.toLowerCase().includes(f) || (p.barcode || '').toLowerCase() === f)
       .filter((p) => stock === 'all' || (stock === 'in') === p.inStock)
   }, [products, filter, stock])
 
@@ -147,6 +152,7 @@ function Dashboard() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={type.h1}>My shop</Text>
           <View style={{ flexDirection: 'row' }}>
+            <IconButton icon="qr-code-outline" label="Shop QR poster" color={colors.text} onPress={() => router.push('/owner/poster')} />
             <IconButton icon="settings-outline" label="Shop settings" color={colors.text} onPress={() => router.push('/owner/settings')} />
             <IconButton icon="log-out-outline" label="Log out" color={colors.danger} onPress={signOut} />
           </View>
@@ -165,8 +171,50 @@ function Dashboard() {
             value={shop.isOpen} busy={toggling === 'isOpen'} onValueChange={() => quickToggle('isOpen')} />
           <SwitchRow icon="bicycle-outline" title="Home delivery" subtitle={shop.homeDelivery ? `Delivering up to ${shop.deliveryRadiusKm} km` : 'Pickup only right now'}
             value={shop.homeDelivery} busy={toggling === 'homeDelivery'} onValueChange={() => quickToggle('homeDelivery')} />
-          <Button variant="outline" icon="eye-outline" title="See what customers see" onPress={() => router.push(`/shop/${shop._id}`)} />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button flex variant="outline" icon="eye-outline" title="Customer view" onPress={() => router.push(`/shop/${shop._id}`)} />
+            <Button flex variant="outline" icon="qr-code-outline" title="QR poster" onPress={() => router.push('/owner/poster')} />
+          </View>
         </Card>
+
+        {week && (
+          <Pressable onPress={() => router.push('/owner/insights')} accessibilityRole="button" accessibilityLabel="Open insights"
+            style={({ pressed }) => [styles.week, pressed && { opacity: 0.92 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: colors.accentLight, fontWeight: '800', fontSize: 12, letterSpacing: 0.8 }}>THIS WEEK</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>See insights</Text>
+                <Ionicons name="chevron-forward" size={16} color="#fff" />
+              </View>
+            </View>
+            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 6 }}>
+              {nf.format(week.totals.contacts)} {week.totals.contacts === 1 ? 'customer' : 'customers'} called or messaged you
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              {[['eye-outline', 'Views', week.totals.views, week.previous.views], ['call-outline', 'Calls', week.totals.calls, week.previous.calls],
+                ['logo-whatsapp', 'WhatsApp', week.totals.whatsapp, week.previous.whatsapp]].map(([icon, label, now, before]) => (
+                <View key={label} style={styles.weekStat}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name={icon} size={13} color={colors.textMuted} />
+                    <Text style={type.small}>{label}</Text>
+                  </View>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>{nf.format(now)}</Text>
+                  <Delta now={now} before={before} compact />
+                </View>
+              ))}
+            </View>
+          </Pressable>
+        )}
+
+        <Pressable onPress={() => router.push('/owner/poster')} accessibilityRole="button" accessibilityLabel="Print your shop QR poster"
+          style={({ pressed }) => [styles.posterCard, pressed && { opacity: 0.9 }]}>
+          <View style={styles.posterIcon}><Ionicons name="qr-code" size={26} color={colors.primary} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontWeight: '800', fontSize: 15, color: colors.text }}>Print your shop QR poster</Text>
+            <Text style={type.small}>Stick it at your counter. Customers scan it to see your items and call you.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
 
         <View style={styles.stats}>
           <Stat icon="cube-outline" label="Items listed" value={products.length} color={colors.primary} />
@@ -181,7 +229,12 @@ function Dashboard() {
             <Card>
               <EmptyState icon="cube-outline" title="Add the items you sell"
                 message={'Customers search for things like "milk" or "rice" and find shops that have them. Shops with a full list get more calls.'}
-                action={<Button icon="add" title="Add your first item" onPress={() => router.push('/owner/item')} />} />
+                action={
+                  <View style={{ gap: 10, alignSelf: 'stretch' }}>
+                    <Button icon="scan-outline" title="Scan products to add them" onPress={() => router.push('/owner/scan')} />
+                    <Button variant="outline" icon="add" title="Add an item by typing" onPress={() => router.push('/owner/item')} />
+                  </View>
+                } />
             </Card>
           ) : (
             <>
@@ -213,10 +266,16 @@ function Dashboard() {
         </View>
       </ScrollView>
       {products.length > 0 && (
-        <Pressable accessibilityRole="button" accessibilityLabel="Add item" onPress={() => router.push('/owner/item')} style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}>
-          <Ionicons name="add" size={24} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Add item</Text>
-        </Pressable>
+        <View style={styles.fabs}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Scan items" onPress={() => router.push('/owner/scan')} style={({ pressed }) => [styles.fab, styles.fabLight, pressed && { opacity: 0.9 }]}>
+            <Ionicons name="scan-outline" size={22} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 15 }}>Scan</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Add item" onPress={() => router.push('/owner/item')} style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}>
+            <Ionicons name="add" size={24} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Add item</Text>
+          </Pressable>
+        </View>
       )}
     </View>
   )
@@ -232,9 +291,15 @@ const styles = StyleSheet.create({
   welcome: { backgroundColor: colors.primary, padding: 20, paddingBottom: 28, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   perkIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  posterCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.accent + '66', backgroundColor: colors.warningSoft },
+  posterIcon: { width: 46, height: 46, borderRadius: 12, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  week: { backgroundColor: colors.primary, borderRadius: radius.xl, padding: 16 },
+  weekStat: { flex: 1, backgroundColor: colors.card, borderRadius: radius.md, padding: 10, gap: 2 },
   stat: { flexGrow: 1, flexBasis: '45%', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 12 },
   statIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, borderRadius: radius.md, paddingHorizontal: 12, height: 46 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 14 },
-  fab: { position: 'absolute', right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 18, height: 52, borderRadius: 26, ...shadow },
+  fabs: { position: 'absolute', right: 16, bottom: 16, flexDirection: 'row', gap: 10 },
+  fabLight: { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.primary },
+  fab: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 18, height: 52, borderRadius: 26, ...shadow },
 })

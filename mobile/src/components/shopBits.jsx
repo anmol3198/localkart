@@ -3,7 +3,8 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { categoryStyle, tint } from '../lib/categories.js'
 import { colors, radius } from '../lib/theme.js'
-import { whatsappUrl } from '../lib/shop.js'
+import { hasWhatsapp, whatsappUrl } from '../lib/shop.js'
+import { track } from '../lib/track.js'
 import { Button } from './ui.jsx'
 
 export function CategoryIcon({ category, size = 48 }) {
@@ -49,8 +50,8 @@ export function DeliveryTag({ shop }) {
 export function CallButtons({ shop, size = 'md' }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
-      <Button flex size={size} icon="call" title="Call to order" onPress={() => Linking.openURL(`tel:${shop.phone}`)} />
-      <Button flex size={size} variant="whatsapp" icon="logo-whatsapp" title="WhatsApp" onPress={() => Linking.openURL(whatsappUrl(shop))} />
+      <Button flex size={size} icon="call" title="Call to order" onPress={() => { track(shop._id, 'CALL'); Linking.openURL(`tel:${shop.phone}`) }} />
+      {hasWhatsapp(shop) && <Button flex size={size} variant="whatsapp" icon="logo-whatsapp" title="WhatsApp" onPress={() => { track(shop._id, 'WHATSAPP'); Linking.openURL(whatsappUrl(shop)) }} />}
     </View>
   )
 }

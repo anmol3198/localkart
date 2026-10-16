@@ -47,6 +47,18 @@ Flyway creates the schema (`src/main/resources/db/migration`). For production, b
    Render sets `PORT`, and Flyway creates the tables on first start.
 3. **UI:** on [Vercel](https://vercel.com), import this repo with root directory `frontend` and set `VITE_API_URL` = `https://<render-app>.onrender.com/api`. `frontend/vercel.json` makes page refreshes on routes like `/shop/:id` work.
 
+## Shop insights (customer activity)
+The website and app report when a customer opens a shop page (`VIEW`) or taps Call, WhatsApp or Directions. Shop owners see the numbers on the dashboard's **Insights** tab (web) and the **Insights** screen (app): totals, the change against the previous period, a day-by-day chart and where customers came from.
+
+- **Counted once per visitor:** each device keeps a random visitor id, and repeats inside 30 minutes (views) or 5 minutes (taps) are ignored, including simultaneous double taps. Owners viewing their own shop are not counted.
+- **Privacy:** only a salted one-way hash of the visitor id (or of IP + user agent when there is no id) is stored, never the raw value or IP.
+- **Abuse limits:** 300 events per IP per 15 minutes; invalid types, sources or ids are rejected with a clear message.
+- Days are counted in India time (Asia/Kolkata). Demo shops get ~45 days of sample activity the first time the app starts with `SEED=true`.
+
+## Barcode scanning and QR poster
+- **Scan to add / update:** items can have an optional barcode (unique within a shop). In the app, **Scan** opens the camera: a known item shows a stock switch and Edit; a new product opens Add item with the name filled in when Open Food Facts knows it (coverage of Indian brands is partial, so the owner may type the name once). On the website, scanning with a USB barcode scanner (or typing a code and pressing Enter) in the inventory search does the same. Retail codes (EAN-8/13, UPC-A, GTIN-14) are checked with their check digit, so typos are caught. Set `BARCODE_LOOKUP=false` to turn the outside lookup off.
+- **QR poster:** owners print an A4 poster (website: dashboard → QR poster; app: My Shop → QR poster) whose QR opens their shop page. On the app set `EXPO_PUBLIC_WEB_URL` to the live website address so posters point to it.
+
 ## Tests
 ```bash
 cd backend && ./mvnw test
@@ -67,6 +79,10 @@ If the app outgrows a single city, switch to PostGIS (`geography(Point)` + `ST_D
 | POST | `/api/auth/register`, `/api/auth/login` | public, rate-limited; returns JWT |
 | GET / PUT | `/api/vendor/shop` | Bearer (PUT is partial) |
 | GET / POST / PUT / DELETE | `/api/vendor/products[/{id}]` | Bearer |
+| GET | `/api/vendor/products/barcode/{code}` | Bearer (scan-to-find the shop's item) |
+| GET | `/api/vendor/barcode-lookup/{code}` | Bearer (suggested name/section for a retail barcode, from Open Food Facts) |
+| POST | `/api/shops/{id}/events` | public, rate-limited: `{"type", "source", "visitorId"}`: type VIEW, CALL, WHATSAPP or DIRECTIONS; source WEB, ANDROID or IOS |
+| GET | `/api/vendor/insights?days=7` (7, 30 or 90) | Bearer (views, calls, WhatsApp, directions: totals, previous period, daily, by source) |
 
 Errors are always `{"message": "..."}`.
 

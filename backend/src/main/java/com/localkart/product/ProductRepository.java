@@ -17,6 +17,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
 	Optional<Product> findByIdAndShopId(UUID id, UUID shopId);
 
+	Optional<Product> findByShopIdAndBarcode(UUID shopId, String barcode);
+
 	/** {@code pattern} is a lower-cased LIKE pattern that uses '!' as its escape character. */
 	@Query("""
 			select p from Product p

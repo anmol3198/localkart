@@ -15,3 +15,12 @@ body { margin: 0; -webkit-font-smoothing: antialiased; }
   width: 18px; height: 18px; border-radius: 50%; background: #2563eb; border: 3px solid #fff;
   box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
+
+/* Printing the QR poster: only the poster, full page */
+@media print {
+  @page { size: A4; margin: 0; }
+  body { background: #fff !important; }
+  .no-print, header, footer { display: none !important; }
+  main > div { padding: 0 !important; max-width: none !important; }
+  .poster { box-shadow: none !important; border: none !important; max-width: none !important; width: 210mm !important; height: 297mm !important; border-radius: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

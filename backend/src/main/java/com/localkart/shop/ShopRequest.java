@@ -4,10 +4,13 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.localkart.common.IndianPhone;
 import com.localkart.common.OnCreate;
+import com.localkart.common.PhoneNumbers;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -26,14 +29,14 @@ import lombok.Setter;
 public class ShopRequest {
 
 	@NotBlank(groups = OnCreate.class, message = "Shop name is required")
-	@Size(max = 120, message = "Shop name is too long")
+	@Pattern(regexp = "(?s)^(?=.*[\\p{L}\\p{N}]).{2,120}$", message = "Shop name must be 2-120 characters and include letters or numbers")
 	private String shopName;
 
 	@NotBlank(groups = OnCreate.class, message = "Phone number is required")
-	@Pattern(regexp = "^\\+?[0-9]{10,13}$", message = "Enter a valid 10-digit phone number")
+	@IndianPhone
 	private String phone;
 
-	@Pattern(regexp = "^$|^\\+?[0-9]{10,13}$", message = "Enter a valid alternate phone number")
+	@IndianPhone(allowBlank = true, message = "Alternate phone: " + PhoneNumbers.INVALID)
 	private String alternatePhone;
 
 	private String category;
@@ -42,7 +45,7 @@ public class ShopRequest {
 	private String description;
 
 	@NotBlank(groups = OnCreate.class, message = "Address is required")
-	@Size(max = 300, message = "Address is too long")
+	@Pattern(regexp = "(?s)^(?=.*\\p{L}).{5,300}$", message = "Enter the full address (5-300 characters, e.g. shop no., street, area)")
 	private String address;
 
 	@Size(max = 80, message = "Opening hours is too long")
@@ -58,18 +61,40 @@ public class ShopRequest {
 	private Double deliveryRadiusKm;
 
 	@PositiveOrZero(message = "Minimum order cannot be negative")
+	@DecimalMax(value = "100000", message = "Minimum order can be at most ₹1,00,000")
+	@Digits(integer = 6, fraction = 2, message = "Minimum order can have at most 2 decimal places")
 	private BigDecimal minOrderAmount;
 
 	@PositiveOrZero(message = "Delivery charge cannot be negative")
+	@DecimalMax(value = "5000", message = "Delivery charge can be at most ₹5,000")
+	@Digits(integer = 4, fraction = 2, message = "Delivery charge can have at most 2 decimal places")
 	private BigDecimal deliveryCharge;
 
 	@NotNull(groups = OnCreate.class, message = "Shop location is required")
-	@DecimalMin(value = "-90", message = "Invalid coordinates")
-	@DecimalMax(value = "90", message = "Invalid coordinates")
+	// LocalKart serves shops in India: roughly its latitude/longitude box.
+	@DecimalMin(value = "6", message = "Shop location must be in India")
+	@DecimalMax(value = "37.5", message = "Shop location must be in India")
 	private Double lat;
 
 	@NotNull(groups = OnCreate.class, message = "Shop location is required")
-	@DecimalMin(value = "-180", message = "Invalid coordinates")
-	@DecimalMax(value = "180", message = "Invalid coordinates")
+	@DecimalMin(value = "68", message = "Shop location must be in India")
+	@DecimalMax(value = "97.5", message = "Shop location must be in India")
 	private Double lng;
+
+	// Clean input before validation (Jackson calls these setters): trim text, accept "+91 98765-43210" etc.
+	public void setShopName(String shopName) {
+		this.shopName = shopName == null ? null : shopName.trim();
+	}
+
+	public void setAddress(String address) {
+		this.address = address == null ? null : address.trim();
+	}
+
+	public void setPhone(String phone) {
+		this.phone = PhoneNumbers.normalize(phone);
+	}
+
+	public void setAlternatePhone(String alternatePhone) {
+		this.alternatePhone = PhoneNumbers.normalize(alternatePhone);
+	}
 }

@@ -38,6 +38,7 @@ public class Product {
 	private String unit = "piece"; // e.g. kg, litre, pack
 	private boolean inStock = true;
 	private String description;
+	private String barcode;
 
 	@CreationTimestamp
 	private Instant createdAt;
