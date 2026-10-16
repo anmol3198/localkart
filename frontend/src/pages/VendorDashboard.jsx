@@ -33,6 +33,7 @@ import OpenBadge from '../components/OpenBadge.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import Insights from '../components/Insights.jsx'
+import SecuritySettings from '../components/SecuritySettings.jsx'
 
 const emptyProduct = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '', barcode: '' }
 const CODE = /^[0-9A-Za-z-]{4,32}$/
@@ -402,6 +403,7 @@ function Settings({ shop, onSaved, notify }) {
     <Stack spacing={2} sx={{ pb: 10 }}>
       {error && <Alert severity="error">{error}</Alert>}
       <ShopForm value={form} onChange={setForm} errors={errors} />
+      <SecuritySettings />
       <Slide direction="up" in={dirty} mountOnEnter unmountOnExit>
         <Paper elevation={12} sx={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%) !important', zIndex: 1200, px: 2, py: 1.25, borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 1.5, width: 'calc(100% - 32px)', maxWidth: 560 }}>
           <Typography sx={{ flex: 1, fontWeight: 600 }}>You have unsaved changes</Typography>

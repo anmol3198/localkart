@@ -30,7 +30,8 @@ import com.jayway.jsonpath.JsonPath;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 
 /** End-to-end API tests against a real (embedded) PostgreSQL with the demo seed data. */
-@SpringBootTest(properties = { "localkart.seed.enabled=true", "localkart.barcode-lookup.enabled=false", "localkart.seed.lat=12.9352", "localkart.seed.lng=77.6245" })
+@SpringBootTest(properties = { "localkart.seed.enabled=true", "localkart.barcode-lookup.enabled=false",
+		"localkart.jwt.secret=test-only-secret-for-integration-tests-0123456789", "localkart.seed.lat=12.9352", "localkart.seed.lng=77.6245" })
 @AutoConfigureMockMvc
 class LocalkartApiApplicationTests {
 
@@ -434,5 +435,76 @@ class LocalkartApiApplicationTests {
 		mvc.perform(post("/api/vendor/products").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"name\":\"Gold\",\"price\":5000000}"))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Price can be at most ₹10,00,000"));
+	}
+
+	private String login(String email, String password) throws Exception {
+		return JsonPath.read(mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.token");
+	}
+
+	@Test
+	void accountLocksAfterTooManyWrongPasswords() throws Exception {
+		registerShop("lockout.owner@example.com");
+		for (int i = 0; i < 10; i++) {
+			// each attempt from a different IP: the per-account limit still applies
+			final int n = i;
+			mvc.perform(post("/api/auth/login").with(r -> { r.setRemoteAddr("10.1.0." + n); return r; })
+					.contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"lockout.owner@example.com\",\"password\":\"wrong1234\"}"))
+					.andExpect(status().isUnauthorized());
+		}
+		// even the right password is refused while locked
+		mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"lockout.owner@example.com\",\"password\":\"secret12\"}"))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(jsonPath("$.message", org.hamcrest.Matchers.startsWith("Too many wrong passwords for this account")));
+		// other accounts are unaffected
+		login("shop3@demo.local", "demo1234");
+	}
+
+	@Test
+	void logoutEverywhereAndPasswordChangeInvalidateOldTokens() throws Exception {
+		String first = registerShop("sessions.owner@example.com");
+		String second = login("sessions.owner@example.com", "secret12");
+
+		String fresh = JsonPath.read(mvc.perform(post("/api/vendor/logout-all").header("Authorization", "Bearer " + first))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.token");
+		mvc.perform(get("/api/vendor/shop").header("Authorization", "Bearer " + first)).andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.message").value("Session expired, please login again"));
+		mvc.perform(get("/api/vendor/shop").header("Authorization", "Bearer " + second)).andExpect(status().isUnauthorized());
+		mvc.perform(get("/api/vendor/shop").header("Authorization", "Bearer " + fresh)).andExpect(status().isOk());
+
+		// change password: checks, then signs out everything else
+		String pw = "/api/vendor/password";
+		mvc.perform(put(pw).header("Authorization", "Bearer " + fresh).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"currentPassword\":\"nope12345\",\"newPassword\":\"newpass123\"}"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Current password is incorrect"));
+		mvc.perform(put(pw).header("Authorization", "Bearer " + fresh).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"currentPassword\":\"secret12\",\"newPassword\":\"weak\"}"))
+				.andExpect(status().isBadRequest());
+		mvc.perform(put(pw).header("Authorization", "Bearer " + fresh).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"currentPassword\":\"secret12\",\"newPassword\":\"secret12\"}"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("New password must be different from the current one"));
+		String afterChange = JsonPath.read(mvc.perform(put(pw).header("Authorization", "Bearer " + fresh).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"currentPassword\":\"secret12\",\"newPassword\":\"newpass123\"}"))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.token");
+		mvc.perform(get("/api/vendor/shop").header("Authorization", "Bearer " + fresh)).andExpect(status().isUnauthorized());
+		mvc.perform(get("/api/vendor/shop").header("Authorization", "Bearer " + afterChange)).andExpect(status().isOk());
+		login("sessions.owner@example.com", "newpass123");
+		mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"sessions.owner@example.com\",\"password\":\"secret12\"}"))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void publicBrowsingIsRateLimitedPerVisitor() throws Exception {
+		for (int i = 0; i < 600; i++) {
+			mvc.perform(get("/api/meta").with(r -> { r.setRemoteAddr("10.2.0.1"); return r; })).andExpect(status().isOk());
+		}
+		mvc.perform(get("/api/meta").with(r -> { r.setRemoteAddr("10.2.0.1"); return r; }))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("Retry-After"));
+		// a different visitor is not affected
+		mvc.perform(get("/api/meta").with(r -> { r.setRemoteAddr("10.2.0.2"); return r; })).andExpect(status().isOk());
 	}
 }

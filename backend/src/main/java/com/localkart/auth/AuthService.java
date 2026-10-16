@@ -19,11 +19,16 @@ public class AuthService {
 	private final ShopRepository shops;
 	private final PasswordEncoder passwordEncoder;
 	private final TokenService tokens;
+	private final LoginAttemptLimiter attempts;
+	// Compared against when the email doesn't exist, so response time doesn't reveal which emails are registered.
+	private final String dummyHash;
 
-	public AuthService(ShopRepository shops, PasswordEncoder passwordEncoder, TokenService tokens) {
+	public AuthService(ShopRepository shops, PasswordEncoder passwordEncoder, TokenService tokens, LoginAttemptLimiter attempts) {
 		this.shops = shops;
 		this.passwordEncoder = passwordEncoder;
 		this.tokens = tokens;
+		this.attempts = attempts;
+		this.dummyHash = passwordEncoder.encode("not-a-real-password-0");
 	}
 
 	@Transactional
@@ -38,15 +43,49 @@ public class AuthService {
 		shop.setPasswordHash(passwordEncoder.encode(req.getPassword()));
 		ShopService.apply(req, shop);
 		shop = shops.saveAndFlush(shop);
-		return new AuthResponse(tokens.issue(shop.getId()), ShopView.forOwner(shop));
+		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
 	}
 
 	@Transactional(readOnly = true)
 	public AuthResponse login(LoginRequest req) {
-		Shop shop = shops.findByEmail(normalize(req.email()))
-				.filter(s -> req.password() != null && passwordEncoder.matches(req.password(), s.getPasswordHash()))
-				.orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
-		return new AuthResponse(tokens.issue(shop.getId()), ShopView.forOwner(shop));
+		String email = normalize(req.email());
+		attempts.check(email);
+		Shop shop = shops.findByEmail(email).orElse(null);
+		boolean ok = passwordEncoder.matches(req.password(), shop != null ? shop.getPasswordHash() : dummyHash);
+		if (shop == null || !ok) {
+			attempts.recordFailure(email);
+			throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+		}
+		attempts.recordSuccess(email);
+		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
+	}
+
+	/** Signs out every device (all older tokens stop working); the caller gets a fresh token. */
+	@Transactional
+	public AuthResponse logoutEverywhere(java.util.UUID shopId) {
+		Shop shop = shops.findById(shopId).orElseThrow(() -> ApiException.notFound("Shop not found"));
+		shop.setTokenVersion(shop.getTokenVersion() + 1);
+		shop = shops.saveAndFlush(shop);
+		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
+	}
+
+	/** Changes the password and signs out all other devices. */
+	@Transactional
+	public AuthResponse changePassword(java.util.UUID shopId, ChangePasswordRequest req) {
+		Shop shop = shops.findById(shopId).orElseThrow(() -> ApiException.notFound("Shop not found"));
+		attempts.check(shop.getEmail());
+		if (!passwordEncoder.matches(req.currentPassword(), shop.getPasswordHash())) {
+			attempts.recordFailure(shop.getEmail());
+			throw ApiException.badRequest("Current password is incorrect");
+		}
+		if (req.currentPassword().equals(req.newPassword())) {
+			throw ApiException.badRequest("New password must be different from the current one");
+		}
+		attempts.recordSuccess(shop.getEmail());
+		shop.setPasswordHash(passwordEncoder.encode(req.newPassword()));
+		shop.setTokenVersion(shop.getTokenVersion() + 1);
+		shop = shops.saveAndFlush(shop);
+		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
 	}
 
 	private static String normalize(String email) {

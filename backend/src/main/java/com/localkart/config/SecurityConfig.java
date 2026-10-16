@@ -1,5 +1,14 @@
 package com.localkart.config;
 
+import java.util.UUID;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import com.localkart.auth.TokenService;
+import com.localkart.shop.ShopRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -79,13 +88,26 @@ public class SecurityConfig {
 		return new BCryptPasswordEncoder();
 	}
 
+	// Old built-in fallback that is public on GitHub; never accept it.
+	private static final String KNOWN_PUBLIC_SECRET = "dev-only-secret-change-me-in-production!!";
+
 	@Bean
 	SecretKey jwtKey(AppProperties props) {
-		byte[] secret = props.jwt().secret().getBytes(StandardCharsets.UTF_8);
-		if (secret.length < 32) {
-			throw new IllegalStateException("localkart.jwt.secret (JWT_SECRET) must be at least 32 characters");
+		return new SecretKeySpec(checkSecret(props.jwt().secret()).getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+	}
+
+	/** Refuses to start with a missing, short or publicly known signing secret (anyone could forge logins). */
+	static String checkSecret(String secret) {
+		if (secret == null || secret.isBlank()) {
+			throw new IllegalStateException("JWT_SECRET is not set. Set it to a random value of at least 32 characters, e.g. the output of: openssl rand -base64 48");
 		}
-		return new SecretKeySpec(secret, "HmacSHA256");
+		if (secret.equals(KNOWN_PUBLIC_SECRET)) {
+			throw new IllegalStateException("JWT_SECRET is the public example value. Generate your own with: openssl rand -base64 48");
+		}
+		if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+			throw new IllegalStateException("JWT_SECRET must be at least 32 characters");
+		}
+		return secret;
 	}
 
 	@Bean
@@ -94,8 +116,28 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtKey) {
-		return NimbusJwtDecoder.withSecretKey(jwtKey).macAlgorithm(MacAlgorithm.HS256).build();
+	JwtDecoder jwtDecoder(SecretKey jwtKey, ShopRepository shops) {
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtKey).macAlgorithm(MacAlgorithm.HS256).build();
+		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefault(), tokenVersionValidator(shops)));
+		return decoder;
+	}
+
+	/**
+	 * A token is only valid while its "ver" claim matches the shop's current token version, so
+	 * "log out of all devices" and password changes cut off older tokens. Also rejects deleted shops.
+	 */
+	static OAuth2TokenValidator<Jwt> tokenVersionValidator(ShopRepository shops) {
+		OAuth2Error expired = new OAuth2Error("invalid_token", "Session expired, please login again", null);
+		return jwt -> {
+			try {
+				Integer current = shops.findTokenVersion(UUID.fromString(jwt.getSubject())).orElse(null);
+				Object claim = jwt.getClaims().get(TokenService.VERSION_CLAIM);
+				int version = claim instanceof Number n ? n.intValue() : 0;
+				return current != null && current == version ? OAuth2TokenValidatorResult.success() : OAuth2TokenValidatorResult.failure(expired);
+			} catch (IllegalArgumentException e) {
+				return OAuth2TokenValidatorResult.failure(expired);
+			}
+		};
 	}
 
 	@Bean

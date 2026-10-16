@@ -50,6 +50,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} keyboardShouldPersistTaps="handled">
         {error ? <Banner kind="error">{error}</Banner> : null}
         <ShopForm value={form} onChange={setForm} errors={errors} />
+        <Button variant="outline" icon="lock-closed-outline" title="Password & security" iconRight="chevron-forward" onPress={() => router.push('/owner/security')} />
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         {dirty ? (

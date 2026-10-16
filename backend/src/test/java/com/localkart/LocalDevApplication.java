@@ -31,6 +31,10 @@ public class LocalDevApplication {
 		System.setProperty("spring.datasource.url", pg.getJdbcUrl("postgres", "postgres"));
 		System.setProperty("spring.datasource.username", "postgres");
 		System.setProperty("spring.datasource.password", "postgres");
+		// Throwaway signing secret for this computer only; production must set JWT_SECRET.
+		if (System.getenv("JWT_SECRET") == null) {
+			System.setProperty("localkart.jwt.secret", "local-dev-only-secret-not-for-production-0123456789");
+		}
 		SpringApplication.from(LocalkartApiApplication::main).run(args);
 	}
 }

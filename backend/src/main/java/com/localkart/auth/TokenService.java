@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
 import com.localkart.config.AppProperties;
+import com.localkart.shop.Shop;
 
 @Service
 public class TokenService {
@@ -23,14 +24,21 @@ public class TokenService {
 		this.props = props;
 	}
 
-	/** Signed HS256 token whose subject is the shop id. */
-	public String issue(UUID shopId) {
+	public static final String VERSION_CLAIM = "ver";
+
+	/** Signed HS256 token whose subject is the shop id; "ver" must match the shop's current token version. */
+	public String issue(Shop shop) {
+		return issue(shop.getId(), shop.getTokenVersion());
+	}
+
+	public String issue(UUID shopId, int version) {
 		Instant now = Instant.now();
 		JwtClaimsSet claims = JwtClaimsSet.builder()
 				.issuer("localkart")
 				.subject(shopId.toString())
 				.issuedAt(now)
 				.expiresAt(now.plus(props.jwt().ttl()))
+				.claim(VERSION_CLAIM, version)
 				.build();
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 		return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

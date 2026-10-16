@@ -30,7 +30,7 @@ Flyway creates the schema (`src/main/resources/db/migration`). For production, b
 | Env var | Default | |
 |---|---|---|
 | `DB_URL` / `DB_USER` / `DB_PASSWORD` | `jdbc:postgresql://localhost:5432/localkart`, `localkart`, `localkart` | |
-| `JWT_SECRET` | dev value | **set in production**, at least 32 characters |
+| `JWT_SECRET` | none (required) | random, at least 32 characters (`openssl rand -base64 48`) |
 | `MAX_SEARCH_RADIUS_KM` | `5` | customer search radius cap |
 | `CORS_ORIGIN` | `*` | comma-separated origin patterns |
 | `SEED` | `true` | demo data, only inserted when the DB is empty |
@@ -59,6 +59,17 @@ The website and app report when a customer opens a shop page (`VIEW`) or taps Ca
 - **Scan to add / update:** items can have an optional barcode (unique within a shop). In the app, **Scan** opens the camera: a known item shows a stock switch and Edit; a new product opens Add item with the name filled in when Open Food Facts knows it (coverage of Indian brands is partial, so the owner may type the name once). On the website, scanning with a USB barcode scanner (or typing a code and pressing Enter) in the inventory search does the same. Retail codes (EAN-8/13, UPC-A, GTIN-14) are checked with their check digit, so typos are caught. Set `BARCODE_LOOKUP=false` to turn the outside lookup off.
 - **QR poster:** owners print an A4 poster (website: dashboard → QR poster; app: My Shop → QR poster) whose QR opens their shop page. On the app set `EXPO_PUBLIC_WEB_URL` to the live website address so posters point to it.
 
+## Security
+- **`JWT_SECRET` is required.** The API refuses to start without it (or with a short or publicly known value), so logins can't be forged. Generate one with `openssl rand -base64 48`. Local dev (`spring-boot:test-run`) sets a throwaway one.
+- Passwords are hashed with bcrypt; 8+ characters with letters and numbers. Login timing doesn't reveal which emails are registered.
+- **Limits:** per IP: 50 login/register attempts, 300 activity events and 600 public browsing requests per 15 minutes (429 with `Retry-After`). Per account: 10 wrong passwords lock that account for 15 minutes. Behind a proxy the real client IP is used (`server.forward-headers-strategy=native`, trusting only private proxy addresses). Limits are in memory, so use Redis or similar when running several instances.
+- **Sessions:** tokens last 7 days and carry a version; "Log out other devices" and password changes invalidate all older tokens.
+- Owners can only read or change their own shop and items. All SQL is parameterised, inputs are validated on the server, and errors never include internal details.
+- **Website headers** (`frontend/public/_headers` for Cloudflare Pages/Netlify, `vercel.json` for Vercel): CSP, HSTS, no framing, nosniff, strict referrer, permissions policy. If the API isn't on `*.onrender.com`, add its origin to `connect-src`.
+- Set `CORS_ORIGIN` to the website's address in production (the default allows any origin).
+- Dependabot (`.github/dependabot.yml`) proposes library updates; turn on Dependabot alerts and security updates in the GitHub repo settings.
+- Not yet: password reset (needs email/SMS, planned with phone OTP), admin approval of new shops, and monitoring/alerting.
+
 ## Tests
 ```bash
 cd backend && ./mvnw test
@@ -80,6 +91,8 @@ If the app outgrows a single city, switch to PostGIS (`geography(Point)` + `ST_D
 | GET / PUT | `/api/vendor/shop` | Bearer (PUT is partial) |
 | GET / POST / PUT / DELETE | `/api/vendor/products[/{id}]` | Bearer |
 | GET | `/api/vendor/products/barcode/{code}` | Bearer (scan-to-find the shop's item) |
+| POST | `/api/vendor/logout-all` | Bearer (signs out every other device; returns a fresh token) |
+| PUT | `/api/vendor/password` | Bearer (`currentPassword`, `newPassword`; signs out other devices) |
 | GET | `/api/vendor/barcode-lookup/{code}` | Bearer (suggested name/section for a retail barcode, from Open Food Facts) |
 | POST | `/api/shops/{id}/events` | public, rate-limited: `{"type", "source", "visitorId"}`: type VIEW, CALL, WHATSAPP or DIRECTIONS; source WEB, ANDROID or IOS |
 | GET | `/api/vendor/insights?days=7` (7, 30 or 90) | Bearer (views, calls, WhatsApp, directions: totals, previous period, daily, by source) |

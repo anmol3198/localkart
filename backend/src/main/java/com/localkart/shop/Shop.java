@@ -56,6 +56,9 @@ public class Shop {
 	@Column(precision = 10, scale = 2)
 	private BigDecimal deliveryCharge = BigDecimal.ZERO;
 
+	/** Incremented to invalidate every login token issued before (log out of all devices). */
+	private int tokenVersion;
+
 	@CreationTimestamp
 	private Instant createdAt;
 

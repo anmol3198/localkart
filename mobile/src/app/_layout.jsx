@@ -35,6 +35,7 @@ export default function RootLayout() {
                 <Stack.Screen name="owner/insights" options={{ title: 'Insights' }} />
                 <Stack.Screen name="owner/scan" options={{ title: 'Scan items' }} />
                 <Stack.Screen name="owner/poster" options={{ title: 'QR poster' }} />
+                <Stack.Screen name="owner/security" options={{ title: 'Password & security' }} />
               </Stack>
             </ToastProvider>
           </NearbyProvider>
