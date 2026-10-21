@@ -82,7 +82,7 @@ export default function RegisterScreen() {
     try {
       const data = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop) })
       await login(data.token)
-      notify('Your shop is live! Now add the items you sell.')
+      notify('Shop registered! We’ll review it shortly. Add your items meanwhile.')
       router.dismissTo('/owner')
     } catch (e) {
       setError(e.message)

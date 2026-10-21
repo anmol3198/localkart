@@ -31,7 +31,10 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 
 /** End-to-end API tests against a real (embedded) PostgreSQL with the demo seed data. */
 @SpringBootTest(properties = { "localkart.seed.enabled=true", "localkart.barcode-lookup.enabled=false",
-		"localkart.jwt.secret=test-only-secret-for-integration-tests-0123456789", "localkart.seed.lat=12.9352", "localkart.seed.lng=77.6245" })
+		"localkart.jwt.secret=test-only-secret-for-integration-tests-0123456789",
+		"localkart.admin.email=root@localkart.test", "localkart.admin.password=RootPass2026",
+		// the suite logs in/registers far more than one real person would from one IP
+		"localkart.rate-limit.auth=5000", "localkart.seed.lat=12.9352", "localkart.seed.lng=77.6245" })
 @AutoConfigureMockMvc
 class LocalkartApiApplicationTests {
 
@@ -126,6 +129,7 @@ class LocalkartApiApplicationTests {
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.shop.email").value("new.vendor@example.com"))
 				.andReturn().getResponse().getContentAsString(), "$.token");
+		approve(shopIdOf(token));
 
 		mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isConflict());
@@ -186,14 +190,38 @@ class LocalkartApiApplicationTests {
 				.andExpect(jsonPath("$.message").value("Invalid email or password"));
 	}
 
-	private String registerShop(String email) throws Exception {
+	private String registerPendingShop(String email) throws Exception {
 		String body = """
 				{"ownerName":"Insights Owner","email":"%s","password":"secret12",
 				 "shopName":"Insights Store","phone":"9000000009","address":"Test Road","lat":13.3000,"lng":77.9000}"""
 				.formatted(email);
 		return JsonPath.read(mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.shop.status").value("PENDING"))
 				.andReturn().getResponse().getContentAsString(), "$.token");
+	}
+
+	/** Registers a shop and approves it as an admin, so it is live for customers. */
+	private String registerShop(String email) throws Exception {
+		String token = registerPendingShop(email);
+		approve(shopIdOf(token));
+		return token;
+	}
+
+	private String adminToken;
+
+	private String admin() throws Exception {
+		if (adminToken == null) {
+			adminToken = "Bearer " + JsonPath.read(mvc.perform(post("/api/admin/auth/login").contentType(MediaType.APPLICATION_JSON)
+					.content("{\"email\":\"root@localkart.test\",\"password\":\"RootPass2026\"}"))
+					.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.token");
+		}
+		return adminToken;
+	}
+
+	private void approve(String shopId) throws Exception {
+		mvc.perform(post("/api/admin/shops/" + shopId + "/approve").header("Authorization", admin()))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
 	}
 
 	private String shopIdOf(String token) throws Exception {
@@ -506,5 +534,130 @@ class LocalkartApiApplicationTests {
 				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("Retry-After"));
 		// a different visitor is not affected
 		mvc.perform(get("/api/meta").with(r -> { r.setRemoteAddr("10.2.0.2"); return r; })).andExpect(status().isOk());
+	}
+
+	private org.springframework.test.web.servlet.ResultActions adminPost(String path, String json) throws Exception {
+		var req = post(path).header("Authorization", admin());
+		if (json != null) req = req.contentType(MediaType.APPLICATION_JSON).content(json);
+		return mvc.perform(req);
+	}
+
+	private static final String FAR = "lat=13.3000&lng=77.9000"; // where registerPendingShop puts test shops
+
+	@Test
+	void newShopsStayHiddenUntilApprovedAndFollowTheReviewFlow() throws Exception {
+		String owner = "Bearer " + registerPendingShop("review.flow@example.com");
+		String id = shopIdOf(owner.substring(7));
+
+		// pending: invisible to customers everywhere
+		mvc.perform(get("/api/shops/nearby?" + FAR + "&q=Insights")).andExpect(jsonPath("$.shops[*]._id", not(hasItem(id))));
+		mvc.perform(get("/api/shops/" + id)).andExpect(status().isNotFound());
+		event(id, "{\"type\":\"VIEW\"}").andExpect(status().isNotFound());
+		mvc.perform(get("/api/vendor/shop").header("Authorization", owner)).andExpect(jsonPath("$.status").value("PENDING"));
+		mvc.perform(get("/api/shops/nearby?" + FAR)).andExpect(jsonPath("$.shops[0].status").doesNotExist());
+
+		// reject needs a reason the owner can read
+		adminPost("/api/admin/shops/" + id + "/reject", "{}").andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("Give the shop owner a reason for rejecting (at least 5 characters)"));
+		adminPost("/api/admin/shops/" + id + "/reject", "{\"reason\":\"Please add a photo of your shop board\"}")
+				.andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED")).andExpect(jsonPath("$.reviewedBy").value("root@localkart.test"));
+		mvc.perform(get("/api/vendor/shop").header("Authorization", owner))
+				.andExpect(jsonPath("$.status").value("REJECTED")).andExpect(jsonPath("$.reviewNote").value("Please add a photo of your shop board"));
+
+		// owner fixes and resubmits
+		mvc.perform(post("/api/vendor/shop/resubmit").header("Authorization", owner)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
+		mvc.perform(post("/api/vendor/shop/resubmit").header("Authorization", owner)).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("Your shop is already waiting for review"));
+
+		// approved: now visible
+		adminPost("/api/admin/shops/" + id + "/approve", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+		adminPost("/api/admin/shops/" + id + "/approve", null).andExpect(status().isBadRequest());
+		mvc.perform(get("/api/shops/nearby?" + FAR)).andExpect(jsonPath("$.shops[*]._id", hasItem(id)));
+		mvc.perform(get("/api/shops/" + id)).andExpect(status().isOk());
+
+		// suspended: hidden again, owner can read but not change anything
+		adminPost("/api/admin/shops/" + id + "/suspend", "{\"reason\":\"x\"}").andExpect(status().isBadRequest());
+		adminPost("/api/admin/shops/" + id + "/suspend", "{\"reason\":\"Customers reported wrong prices\"}")
+				.andExpect(jsonPath("$.status").value("SUSPENDED"));
+		mvc.perform(get("/api/shops/" + id)).andExpect(status().isNotFound());
+		mvc.perform(get("/api/vendor/shop").header("Authorization", owner)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENDED"));
+		mvc.perform(post("/api/vendor/products").header("Authorization", owner).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"name\":\"Rice\",\"price\":10}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.message", org.hamcrest.Matchers.startsWith("Your shop is suspended")));
+		mvc.perform(put("/api/vendor/shop").header("Authorization", owner).contentType(MediaType.APPLICATION_JSON).content("{\"isOpen\":false}"))
+				.andExpect(status().isForbidden());
+
+		adminPost("/api/admin/shops/" + id + "/reinstate", null).andExpect(jsonPath("$.status").value("APPROVED"));
+		mvc.perform(get("/api/shops/" + id)).andExpect(status().isOk());
+
+		// every step is in the audit log, newest first
+		mvc.perform(get("/api/admin/audit?size=5").header("Authorization", admin()))
+				.andExpect(jsonPath("$.items[0].action").value("SHOP_REINSTATED"))
+				.andExpect(jsonPath("$.items[1].action").value("SHOP_SUSPENDED"))
+				.andExpect(jsonPath("$.items[1].details").value("APPROVED -> SUSPENDED: Customers reported wrong prices"))
+				.andExpect(jsonPath("$.items[2].action").value("SHOP_APPROVED"));
+
+		// the queue lists pending shops, oldest first, with owner details for staff
+		registerPendingShop("queue.one@example.com");
+		mvc.perform(get("/api/admin/shops?status=pending&q=queue.one").header("Authorization", admin()))
+				.andExpect(jsonPath("$.total").value(1)).andExpect(jsonPath("$.items[0].email").value("queue.one@example.com"))
+				.andExpect(jsonPath("$.items[0].status").value("PENDING"));
+		mvc.perform(get("/api/admin/shops?status=nope").header("Authorization", admin())).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void rolesAreEnforcedOnTheServer() throws Exception {
+		String owner = "Bearer " + registerShop("roles.owner@example.com");
+		mvc.perform(get("/api/admin/stats")).andExpect(status().isUnauthorized());
+		mvc.perform(get("/api/admin/stats").header("Authorization", owner)).andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.message").value("You don't have access to this"));
+		mvc.perform(post("/api/admin/shops/" + shopIdOf(owner.substring(7)) + "/approve").header("Authorization", owner)).andExpect(status().isForbidden());
+		mvc.perform(get("/api/vendor/shop").header("Authorization", admin())).andExpect(status().isForbidden());
+
+		// admin login: wrong password, then a normal ADMIN created by the super admin
+		mvc.perform(post("/api/admin/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"root@localkart.test\",\"password\":\"wrong\"}")).andExpect(status().isUnauthorized());
+		adminPost("/api/admin/admins", "{\"name\":\"Ravi\",\"email\":\"ravi@localkart.test\",\"password\":\"short1\",\"role\":\"ADMIN\"}")
+				.andExpect(status().isBadRequest());
+		String raviId = JsonPath.read(adminPost("/api/admin/admins", "{\"name\":\"Ravi Kumar\",\"email\":\"Ravi@LocalKart.test\",\"password\":\"RaviPass2026\",\"role\":\"ADMIN\"}")
+				.andExpect(status().isCreated()).andExpect(jsonPath("$.email").value("ravi@localkart.test"))
+				.andReturn().getResponse().getContentAsString(), "$.id");
+		adminPost("/api/admin/admins", "{\"name\":\"Ravi Again\",\"email\":\"ravi@localkart.test\",\"password\":\"RaviPass2026\",\"role\":\"ADMIN\"}")
+				.andExpect(status().isConflict());
+		String ravi = "Bearer " + JsonPath.read(mvc.perform(post("/api/admin/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"ravi@localkart.test\",\"password\":\"RaviPass2026\"}"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.admin.role").value("ADMIN"))
+				.andReturn().getResponse().getContentAsString(), "$.token");
+
+		// ADMIN can moderate and see stats, but only a SUPER_ADMIN manages staff
+		mvc.perform(get("/api/admin/stats").header("Authorization", ravi)).andExpect(status().isOk());
+		mvc.perform(get("/api/admin/admins").header("Authorization", ravi)).andExpect(status().isForbidden());
+
+		// deactivating cuts their session immediately; nobody can deactivate themselves
+		String rootId = JsonPath.read(mvc.perform(get("/api/admin/me").header("Authorization", admin())).andReturn().getResponse().getContentAsString(), "$.id");
+		mvc.perform(put("/api/admin/admins/" + rootId + "/active").header("Authorization", admin()).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"active\":false}")).andExpect(status().isBadRequest());
+		mvc.perform(put("/api/admin/admins/" + raviId + "/active").header("Authorization", admin()).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"active\":false}")).andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+		mvc.perform(get("/api/admin/stats").header("Authorization", ravi)).andExpect(status().isUnauthorized());
+		mvc.perform(post("/api/admin/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"ravi@localkart.test\",\"password\":\"RaviPass2026\"}")).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void superAdminDashboardShowsAppWideNumbers() throws Exception {
+		registerPendingShop("stats.pending@example.com");
+		mvc.perform(get("/api/admin/stats").header("Authorization", admin()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.shops.pending", org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+				.andExpect(jsonPath("$.shops.approved", org.hamcrest.Matchers.greaterThanOrEqualTo(6)))
+				.andExpect(jsonPath("$.shops.total", org.hamcrest.Matchers.greaterThanOrEqualTo(7)))
+				.andExpect(jsonPath("$.newShops.length()").value(30))
+				.andExpect(jsonPath("$.byCategory[*].name", hasItem("Grocery")))
+				.andExpect(jsonPath("$.activity30d.views", org.hamcrest.Matchers.greaterThan(0)))
+				.andExpect(jsonPath("$.activity30d.uniqueVisitors", org.hamcrest.Matchers.greaterThan(0)))
+				.andExpect(jsonPath("$.topShops[0].shopName").exists())
+				.andExpect(jsonPath("$.admins", org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
 	}
 }

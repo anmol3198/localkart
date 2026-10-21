@@ -56,7 +56,7 @@ public class ShopService {
 		record Candidate(Shop shop, double distanceKm) {
 		}
 		List<Candidate> inRange = shops
-				.findByLatitudeBetweenAndLongitudeBetween(box.minLat(), box.maxLat(), box.minLng(), box.maxLng())
+				.findByLatitudeBetweenAndLongitudeBetweenAndStatus(box.minLat(), box.maxLat(), box.minLng(), box.maxLng(), ShopStatus.APPROVED)
 				.stream()
 				.filter(s -> category == null || category.isBlank() || category.equals(s.getCategory()))
 				.filter(s -> !deliveryOnly || s.isHomeDelivery())
@@ -86,7 +86,8 @@ public class ShopService {
 
 	@Transactional(readOnly = true)
 	public ShopDetail detail(UUID id, Double lat, Double lng) {
-		Shop shop = shops.findById(id).orElseThrow(() -> ApiException.notFound("Shop not found"));
+		// Shops waiting for review, rejected or suspended look like they don't exist to customers.
+		Shop shop = shops.findByIdAndStatus(id, ShopStatus.APPROVED).orElseThrow(() -> ApiException.notFound("Shop not found"));
 		ShopView view = Geo.isValid(lat, lng) ? ShopView.forCustomerAt(shop, lat, lng, null) : ShopView.forPublic(shop);
 		List<ProductView> inventory = products.findByShopIdOrderByInStockDescCategoryAscNameAsc(id).stream()
 				.map(ProductView::of)
@@ -102,8 +103,31 @@ public class ShopService {
 	@Transactional
 	public Shop update(UUID id, ShopRequest req) {
 		Shop shop = get(id);
+		requireNotSuspended(shop);
 		apply(req, shop);
 		return shops.saveAndFlush(shop);
+	}
+
+	/** After a rejection the owner fixes the details and sends the shop back for review. */
+	@Transactional
+	public Shop resubmit(UUID id) {
+		Shop shop = get(id);
+		requireNotSuspended(shop);
+		if (shop.getStatus() != ShopStatus.REJECTED) {
+			throw ApiException.badRequest(shop.getStatus() == ShopStatus.PENDING ? "Your shop is already waiting for review"
+					: "Only a rejected shop can be sent for review again");
+		}
+		shop.setStatus(ShopStatus.PENDING);
+		shop.setSubmittedAt(java.time.Instant.now());
+		return shops.saveAndFlush(shop);
+	}
+
+	/** Suspended shops can log in and see why, but can't change anything. */
+	public static void requireNotSuspended(Shop shop) {
+		if (shop.getStatus() == ShopStatus.SUSPENDED) {
+			throw new ApiException(org.springframework.http.HttpStatus.FORBIDDEN,
+					"Your shop is suspended, so changes are paused. Contact LocalKart support to sort it out.");
+		}
 	}
 
 	/** Copies the non-null fields of {@code req} onto {@code shop}. */

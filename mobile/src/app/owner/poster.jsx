@@ -30,6 +30,9 @@ export default function PosterScreen() {
 
   if (error) return <View style={{ padding: 16 }}><Banner kind="error">{error}</Banner></View>
   if (!shop || !svg) return <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />
+  if (shop.status && shop.status !== 'APPROVED') {
+    return <View style={{ padding: 16 }}><Banner kind="info">Your QR poster will be ready once your shop is approved and live.</Banner></View>
+  }
 
   const url = shopWebUrl(shop._id)
   const html = posterHtml({ shop, url, svg })

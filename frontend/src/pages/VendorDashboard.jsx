@@ -34,6 +34,7 @@ import EmptyState from '../components/EmptyState.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import Insights from '../components/Insights.jsx'
 import SecuritySettings from '../components/SecuritySettings.jsx'
+import ShopStatusBanner from '../components/ShopStatusBanner.jsx'
 
 const emptyProduct = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '', barcode: '' }
 const CODE = /^[0-9A-Za-z-]{4,32}$/
@@ -469,8 +470,11 @@ export default function VendorDashboard() {
   const out = products?.filter((p) => !p.inStock).length ?? 0
   const sections = new Set(products?.map((p) => p.category)).size
 
+  const live = shop.status === 'APPROVED' || !shop.status
+
   return (
     <Stack spacing={2.5}>
+      <ShopStatusBanner shop={shop} onChange={setShop} onFix={() => setTab(2)} />
       <Card sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center', minWidth: 0 }}>
@@ -484,15 +488,17 @@ export default function VendorDashboard() {
               </Stack>
             </Box>
           </Stack>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignSelf: { xs: 'stretch', md: 'center' }, flexShrink: 0 }}>
-            <Button variant="outlined" startIcon={<QrCode2Icon />} component={RouterLink} to="/vendor/poster">QR poster</Button>
-            <Button variant="outlined" startIcon={<VisibilityIcon />} component={RouterLink} to={`/shop/${shop._id}`}>See what customers see</Button>
-          </Stack>
+          {live && (
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignSelf: { xs: 'stretch', md: 'center' }, flexShrink: 0 }}>
+              <Button variant="outlined" startIcon={<QrCode2Icon />} component={RouterLink} to="/vendor/poster">QR poster</Button>
+              <Button variant="outlined" startIcon={<VisibilityIcon />} component={RouterLink} to={`/shop/${shop._id}`}>See what customers see</Button>
+            </Stack>
+          )}
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2.5 }}>
           <QuickToggle
             icon={<StorefrontIcon />} title="Shop open" on={shop.isOpen} busy={toggling === 'isOpen'} onChange={() => quickToggle('isOpen')}
-            onText="Customers see you as open now" offText="Shown as closed to customers"
+            onText={live ? 'Customers see you as open now' : 'Will show as open once approved'} offText="Shown as closed to customers"
           />
           <QuickToggle
             icon={<LocalShippingIcon />} title="Home delivery" on={shop.homeDelivery} busy={toggling === 'homeDelivery'} onChange={() => quickToggle('homeDelivery')}

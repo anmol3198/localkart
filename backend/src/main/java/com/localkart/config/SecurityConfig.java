@@ -1,5 +1,10 @@
 package com.localkart.config;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import com.localkart.admin.AdminRepository;
+import com.localkart.auth.Role;
 import java.util.UUID;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -43,6 +48,8 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 public class SecurityConfig {
 
 	private static final String VENDOR_PATHS = "/api/vendor/";
+	private static final String ADMIN_PATHS = "/api/admin/";
+	private static final String ADMIN_LOGIN = "/api/admin/auth/";
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -51,24 +58,56 @@ public class SecurityConfig {
 				.csrf(csrf -> csrf.disable())
 				.cors(Customizer.withDefaults())
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				// Role checks happen here, on the server, for every request; hiding buttons in the apps is only cosmetic.
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers(VENDOR_PATHS + "**").authenticated()
+						.requestMatchers(ADMIN_LOGIN + "**").permitAll()
+						.requestMatchers(ADMIN_PATHS + "admins/**").hasRole(Role.SUPER_ADMIN.name())
+						.requestMatchers(ADMIN_PATHS + "**").hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
+						.requestMatchers(VENDOR_PATHS + "**").hasRole(Role.SHOP_OWNER.name())
 						.anyRequest().permitAll())
 				.oauth2ResourceServer(o -> o
-						.jwt(Customizer.withDefaults())
-						.bearerTokenResolver(vendorOnlyTokenResolver())
+						.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter()))
+						.bearerTokenResolver(protectedPathsTokenResolver())
 						.authenticationEntryPoint(entryPoint))
-				.exceptionHandling(e -> e.authenticationEntryPoint(entryPoint));
+				.exceptionHandling(e -> e.authenticationEntryPoint(entryPoint).accessDeniedHandler(jsonAccessDenied()));
 		return http.build();
 	}
 
 	/**
-	 * Only read the bearer token on vendor endpoints, so an expired vendor token never blocks
-	 * public browsing.
+	 * Only read the bearer token on vendor/admin endpoints (not the admin login itself), so an expired token
+	 * never blocks public browsing or logging in again.
 	 */
-	private static BearerTokenResolver vendorOnlyTokenResolver() {
+	private static BearerTokenResolver protectedPathsTokenResolver() {
 		DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
-		return request -> request.getRequestURI().startsWith(VENDOR_PATHS) ? delegate.resolve(request) : null;
+		return request -> {
+			String uri = request.getRequestURI();
+			boolean isProtected = uri.startsWith(VENDOR_PATHS) || (uri.startsWith(ADMIN_PATHS) && !uri.startsWith(ADMIN_LOGIN));
+			return isProtected ? delegate.resolve(request) : null;
+		};
+	}
+
+	/** The token's "role" claim becomes the caller's authority. Tokens from before roles existed are shop owners. */
+	static JwtAuthenticationConverter roleConverter() {
+		JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+		converter.setJwtGrantedAuthoritiesConverter(jwt -> List.of(new SimpleGrantedAuthority(roleOf(jwt).authority())));
+		return converter;
+	}
+
+	static Role roleOf(Jwt jwt) {
+		try {
+			String role = jwt.getClaimAsString(Role.CLAIM);
+			return role == null ? Role.SHOP_OWNER : Role.valueOf(role);
+		} catch (IllegalArgumentException e) {
+			return Role.SHOP_OWNER;
+		}
+	}
+
+	private static AccessDeniedHandler jsonAccessDenied() {
+		return (request, response, ex) -> {
+			response.setStatus(HttpStatus.FORBIDDEN.value());
+			response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+			response.getWriter().write("{\"message\":\"You don't have access to this\"}");
+		};
 	}
 
 	private static AuthenticationEntryPoint jsonEntryPoint() {
@@ -116,9 +155,9 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtKey, ShopRepository shops) {
+	JwtDecoder jwtDecoder(SecretKey jwtKey, ShopRepository shops, AdminRepository admins) {
 		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtKey).macAlgorithm(MacAlgorithm.HS256).build();
-		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefault(), tokenVersionValidator(shops)));
+		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefault(), tokenVersionValidator(shops, admins)));
 		return decoder;
 	}
 
@@ -126,11 +165,14 @@ public class SecurityConfig {
 	 * A token is only valid while its "ver" claim matches the shop's current token version, so
 	 * "log out of all devices" and password changes cut off older tokens. Also rejects deleted shops.
 	 */
-	static OAuth2TokenValidator<Jwt> tokenVersionValidator(ShopRepository shops) {
+	static OAuth2TokenValidator<Jwt> tokenVersionValidator(ShopRepository shops, AdminRepository admins) {
 		OAuth2Error expired = new OAuth2Error("invalid_token", "Session expired, please login again", null);
 		return jwt -> {
 			try {
-				Integer current = shops.findTokenVersion(UUID.fromString(jwt.getSubject())).orElse(null);
+				UUID id = UUID.fromString(jwt.getSubject());
+				// Admin tokens are checked against admin accounts (deactivated admins are cut off), shop tokens against shops.
+				Integer current = roleOf(jwt) == Role.SHOP_OWNER ? shops.findTokenVersion(id).orElse(null)
+						: admins.findActiveTokenVersion(id).orElse(null);
 				Object claim = jwt.getClaims().get(TokenService.VERSION_CLAIM);
 				int version = claim instanceof Number n ? n.intValue() : 0;
 				return current != null && current == version ? OAuth2TokenValidatorResult.success() : OAuth2TokenValidatorResult.failure(expired);

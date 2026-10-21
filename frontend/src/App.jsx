@@ -13,6 +13,7 @@ import VendorRegister from './pages/VendorRegister.jsx'
 import VendorDashboard from './pages/VendorDashboard.jsx'
 import VendorPoster from './pages/VendorPoster.jsx'
 import { useAuth } from './lib/auth.jsx'
+import AdminApp from './admin/AdminApp.jsx'
 
 function VendorOnly({ children }) {
   const { token } = useAuth()
@@ -40,6 +41,10 @@ function NotFound() {
 
 export default function App() {
   const { pathname } = useLocation()
+  // The staff area has its own layout and sign-in.
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    return <><ScrollToTop /><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></>
+  }
   // The home page draws its own full-width hero, so it manages its own container.
   const fullBleed = pathname === '/'
   return (

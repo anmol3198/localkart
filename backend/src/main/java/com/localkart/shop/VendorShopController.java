@@ -28,6 +28,11 @@ public class VendorShopController {
 		return ShopView.forOwner(shopService.get(UUID.fromString(jwt.getSubject())));
 	}
 
+	@org.springframework.web.bind.annotation.PostMapping("/resubmit")
+	public ShopView resubmit(@AuthenticationPrincipal Jwt jwt) {
+		return ShopView.forOwner(shopService.resubmit(UUID.fromString(jwt.getSubject())));
+	}
+
 	/** Partial update: only fields present in the body change (e.g. {"isOpen": false}). */
 	@PutMapping
 	public ShopView update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ShopRequest req) {

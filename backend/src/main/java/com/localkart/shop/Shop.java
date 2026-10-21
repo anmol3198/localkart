@@ -56,6 +56,18 @@ public class Shop {
 	@Column(precision = 10, scale = 2)
 	private BigDecimal deliveryCharge = BigDecimal.ZERO;
 
+	// Review by LocalKart staff; customers only see APPROVED shops.
+	@jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+	private ShopStatus status = ShopStatus.PENDING;
+	private String reviewNote;
+	private Instant reviewedAt;
+	private String reviewedBy;
+	private Instant submittedAt;
+
+	public boolean isApproved() {
+		return status == ShopStatus.APPROVED;
+	}
+
 	/** Incremented to invalidate every login token issued before (log out of all devices). */
 	private int tokenVersion;
 

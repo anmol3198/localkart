@@ -36,7 +36,10 @@ public record ShopView(
 		Instant updatedAt,
 		Double distanceKm,
 		Boolean deliversToYou,
-		List<ProductView> matchingProducts) {
+		List<ProductView> matchingProducts,
+		// Owner-only: review state and the admin's note (e.g. why it was rejected)
+		ShopStatus status,
+		String reviewNote) {
 
 	public record GeoPoint(String type, double[] coordinates) {
 		static GeoPoint of(double lat, double lng) {
@@ -46,25 +49,27 @@ public record ShopView(
 
 	/** Full view for the shop owner, including the login email. */
 	public static ShopView forOwner(Shop s) {
-		return build(s, s.getEmail(), null, null);
+		return build(s, s.getEmail(), null, null, true);
 	}
 
 	/** Public view; the vendor's email is never exposed to customers. */
 	public static ShopView forPublic(Shop s) {
-		return build(s, null, null, null);
+		return build(s, null, null, null, false);
 	}
 
 	public static ShopView forCustomerAt(Shop s, double lat, double lng, List<ProductView> matchingProducts) {
-		return build(s, null, s.distanceKmFrom(lat, lng), matchingProducts);
+		return build(s, null, s.distanceKmFrom(lat, lng), matchingProducts, false);
 	}
 
-	private static ShopView build(Shop s, String email, Double distanceKm, List<ProductView> matching) {
+	private static ShopView build(Shop s, String email, Double distanceKm, List<ProductView> matching, boolean owner) {
 		return new ShopView(s.getId(), s.getOwnerName(), email, s.getShopName(), s.getPhone(), s.getAlternatePhone(),
 				s.getCategory(), s.getDescription(), s.getAddress(), GeoPoint.of(s.getLatitude(), s.getLongitude()),
 				s.getOpeningHours(), s.isOpen(), s.isHomeDelivery(), s.getDeliveryRadiusKm(), s.getMinOrderAmount(),
 				s.getDeliveryCharge(), s.getCreatedAt(), s.getUpdatedAt(),
 				distanceKm == null ? null : Geo.round2(distanceKm),
 				distanceKm == null ? null : s.deliversWithin(distanceKm),
-				matching);
+				matching,
+				owner ? s.getStatus() : null,
+				owner ? s.getReviewNote() : null);
 	}
 }

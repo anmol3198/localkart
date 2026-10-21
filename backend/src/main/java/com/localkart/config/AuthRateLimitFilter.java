@@ -34,22 +34,28 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 	private record Rule(String name, int limit, String message, Predicate<HttpServletRequest> matches) {
 	}
 
-	private static final List<Rule> RULES = List.of(
-			new Rule("auth", 50, "Too many attempts, please try again later",
-					r -> r.getRequestURI().startsWith("/api/auth/")),
-			new Rule("events", 300, "Too many requests, please slow down",
+	private final List<Rule> rules;
+
+	public AuthRateLimitFilter(@org.springframework.beans.factory.annotation.Value("${localkart.rate-limit.auth:50}") int authLimit,
+			@org.springframework.beans.factory.annotation.Value("${localkart.rate-limit.events:300}") int eventsLimit,
+			@org.springframework.beans.factory.annotation.Value("${localkart.rate-limit.browse:600}") int browseLimit) {
+		this.rules = List.of(
+			new Rule("auth", authLimit, "Too many attempts, please try again later",
+					r -> r.getRequestURI().startsWith("/api/auth/") || r.getRequestURI().startsWith("/api/admin/auth/")),
+			new Rule("events", eventsLimit, "Too many requests, please slow down",
 					r -> "POST".equals(r.getMethod()) && EVENTS_PATH.matcher(r.getRequestURI()).matches()),
 			// ~40 a minute: far above normal browsing, well below scripted scraping
-			new Rule("browse", 600, "Too many requests, please slow down",
+			new Rule("browse", browseLimit, "Too many requests, please slow down",
 					r -> "GET".equals(r.getMethod()) && (r.getRequestURI().startsWith("/api/shops") || r.getRequestURI().equals("/api/meta"))));
+	}
 
 	private record Window(long startedAt, int count) {
 	}
 
 	private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
-	private static Rule ruleFor(HttpServletRequest request) {
-		return RULES.stream().filter(r -> r.matches().test(request)).findFirst().orElse(null);
+	private Rule ruleFor(HttpServletRequest request) {
+		return rules.stream().filter(r -> r.matches().test(request)).findFirst().orElse(null);
 	}
 
 	@Override

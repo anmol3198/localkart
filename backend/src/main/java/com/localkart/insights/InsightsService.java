@@ -54,7 +54,7 @@ public class InsightsService {
 	 */
 	@Transactional
 	public boolean record(UUID shopId, EventRequest req, String fallbackClientKey) {
-		if (!shops.existsById(shopId)) {
+		if (!shops.existsByIdAndStatus(shopId, com.localkart.shop.ShopStatus.APPROVED)) {
 			throw ApiException.notFound("Shop not found");
 		}
 		EventType type = EventType.valueOf(req.type().toUpperCase(Locale.ROOT));

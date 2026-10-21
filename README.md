@@ -59,6 +59,22 @@ The website and app report when a customer opens a shop page (`VIEW`) or taps Ca
 - **Scan to add / update:** items can have an optional barcode (unique within a shop). In the app, **Scan** opens the camera: a known item shows a stock switch and Edit; a new product opens Add item with the name filled in when Open Food Facts knows it (coverage of Indian brands is partial, so the owner may type the name once). On the website, scanning with a USB barcode scanner (or typing a code and pressing Enter) in the inventory search does the same. Retail codes (EAN-8/13, UPC-A, GTIN-14) are checked with their check digit, so typos are caught. Set `BARCODE_LOOKUP=false` to turn the outside lookup off.
 - **QR poster:** owners print an A4 poster (website: dashboard → QR poster; app: My Shop → QR poster) whose QR opens their shop page. On the app set `EXPO_PUBLIC_WEB_URL` to the live website address so posters point to it.
 
+## Roles, shop review and the admin area
+| Role | Who | Can |
+|---|---|---|
+| (none) | Customers | Browse approved shops, call/WhatsApp, no login needed |
+| `SHOP_OWNER` | Registered shops | Manage their own shop, items and insights (`/api/vendor/**`) |
+| `ADMIN` | LocalKart staff | Review and moderate shops, see the dashboard and audit log (`/api/admin/**`) |
+| `SUPER_ADMIN` | You | Everything an admin can, plus add/deactivate admins (`/api/admin/admins/**`) |
+
+The role is in the login token and checked by the API on every request.
+
+- **New shops start as `PENDING` and are invisible to customers** (search, shop page, activity) until staff approve them. Staff can reject (with a note the owner sees), suspend a live shop (hidden, owner can't make changes), or reinstate it. Owners see their status on the dashboard and can fix their details and resubmit. Every action goes to the audit log.
+- **Admin area:** `/admin` on the website (not linked from the public pages, marked noindex): dashboard with app-wide numbers, review queue, all shops, audit log, and admin accounts for super admins.
+- **First super admin:** set `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` (10+ characters with letters and numbers) on the API; it is created on start-up if that email has no account. Add more admins from the admin area. Admin accounts can't be created through public sign-up.
+- **Local dev:** `spring-boot:test-run` creates `admin@localkart.test` / `LocalAdmin2026` (only on your computer).
+- Not yet: business-document upload and shopfront photo (step 2), phone OTP (step 3), 2-step verification for admins.
+
 ## Security
 - **`JWT_SECRET` is required.** The API refuses to start without it (or with a short or publicly known value), so logins can't be forged. Generate one with `openssl rand -base64 48`. Local dev (`spring-boot:test-run`) sets a throwaway one.
 - Passwords are hashed with bcrypt; 8+ characters with letters and numbers. Login timing doesn't reveal which emails are registered.
@@ -93,6 +109,11 @@ If the app outgrows a single city, switch to PostGIS (`geography(Point)` + `ST_D
 | GET | `/api/vendor/products/barcode/{code}` | Bearer (scan-to-find the shop's item) |
 | POST | `/api/vendor/logout-all` | Bearer (signs out every other device; returns a fresh token) |
 | PUT | `/api/vendor/password` | Bearer (`currentPassword`, `newPassword`; signs out other devices) |
+| POST | `/api/vendor/shop/resubmit` | Bearer, shop owner (send a rejected shop for review again) |
+| POST | `/api/admin/auth/login` | public, rate-limited (staff sign-in) |
+| GET | `/api/admin/stats`, `/api/admin/shops?status&q&page`, `/api/admin/shops/{id}`, `/api/admin/audit` | admin |
+| POST | `/api/admin/shops/{id}/approve` · `reject` · `suspend` · `reinstate` (`{"reason"}`) | admin |
+| GET / POST / PUT | `/api/admin/admins`, `/api/admin/admins/{id}/active` | super admin |
 | GET | `/api/vendor/barcode-lookup/{code}` | Bearer (suggested name/section for a retail barcode, from Open Food Facts) |
 | POST | `/api/shops/{id}/events` | public, rate-limited: `{"type", "source", "visitorId"}`: type VIEW, CALL, WHATSAPP or DIRECTIONS; source WEB, ANDROID or IOS |
 | GET | `/api/vendor/insights?days=7` (7, 30 or 90) | Bearer (views, calls, WhatsApp, directions: totals, previous period, daily, by source) |

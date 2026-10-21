@@ -42,6 +42,9 @@ public class AuthService {
 		shop.setEmail(email);
 		shop.setPasswordHash(passwordEncoder.encode(req.getPassword()));
 		ShopService.apply(req, shop);
+		// New shops wait for LocalKart staff to check them before customers can see them.
+		shop.setStatus(com.localkart.shop.ShopStatus.PENDING);
+		shop.setSubmittedAt(java.time.Instant.now());
 		shop = shops.saveAndFlush(shop);
 		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
 	}

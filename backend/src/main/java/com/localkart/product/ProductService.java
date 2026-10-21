@@ -13,9 +13,15 @@ import com.localkart.common.ApiException;
 public class ProductService {
 
 	private final ProductRepository products;
+	private final com.localkart.shop.ShopRepository shops;
 
-	public ProductService(ProductRepository products) {
+	public ProductService(ProductRepository products, com.localkart.shop.ShopRepository shops) {
 		this.products = products;
+		this.shops = shops;
+	}
+
+	private void requireEditable(UUID shopId) {
+		shops.findById(shopId).ifPresent(com.localkart.shop.ShopService::requireNotSuspended);
 	}
 
 	@Transactional(readOnly = true)
@@ -31,6 +37,7 @@ public class ProductService {
 
 	@Transactional
 	public Product create(UUID shopId, ProductRequest req) {
+		requireEditable(shopId);
 		Product p = new Product();
 		p.setShopId(shopId);
 		apply(req, p);
@@ -40,6 +47,7 @@ public class ProductService {
 
 	@Transactional
 	public Product update(UUID shopId, UUID id, ProductRequest req) {
+		requireEditable(shopId);
 		Product p = owned(shopId, id);
 		apply(req, p);
 		checkBarcodeFree(shopId, p);
@@ -48,6 +56,7 @@ public class ProductService {
 
 	@Transactional
 	public void delete(UUID shopId, UUID id) {
+		requireEditable(shopId);
 		products.delete(owned(shopId, id));
 	}
 

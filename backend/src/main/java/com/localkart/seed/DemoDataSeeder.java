@@ -95,6 +95,8 @@ public class DemoDataSeeder implements ApplicationRunner {
 			Shop s = new Shop();
 			s.setOwnerName("Demo Owner " + (i + 1));
 			s.setEmail("shop" + (i + 1) + "@demo.local");
+			s.setStatus(com.localkart.shop.ShopStatus.APPROVED);
+			s.setSubmittedAt(java.time.Instant.now());
 			s.setPasswordHash(hash);
 			s.setShopName(d.name());
 			s.setCategory(d.category());

@@ -11,6 +11,7 @@ import { colors, radius, shadow, type } from '../../lib/theme.js'
 import { Banner, Button, Card, Chip, EmptyState, IconButton, SwitchRow } from '../../components/ui.jsx'
 import { CategoryIcon, OpenBadge } from '../../components/shopBits.jsx'
 import { Delta } from '../../components/InsightsBits.jsx'
+import ShopStatusBanner from '../../components/ShopStatusBanner.jsx'
 import { nf } from '../../lib/insights.js'
 
 const PERKS = [
@@ -141,6 +142,7 @@ function Dashboard() {
   if (!shop || !products) return <ActivityIndicator style={{ marginTop: insets.top + 80 }} size="large" color={colors.primary} />
 
   const out = products.filter((p) => !p.inStock).length
+  const live = shop.status === 'APPROVED' || !shop.status
 
   return (
     <View style={{ flex: 1 }}>
@@ -152,11 +154,13 @@ function Dashboard() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={type.h1}>My shop</Text>
           <View style={{ flexDirection: 'row' }}>
-            <IconButton icon="qr-code-outline" label="Shop QR poster" color={colors.text} onPress={() => router.push('/owner/poster')} />
+            {live && <IconButton icon="qr-code-outline" label="Shop QR poster" color={colors.text} onPress={() => router.push('/owner/poster')} />}
             <IconButton icon="settings-outline" label="Shop settings" color={colors.text} onPress={() => router.push('/owner/settings')} />
             <IconButton icon="log-out-outline" label="Log out" color={colors.danger} onPress={signOut} />
           </View>
         </View>
+
+        <ShopStatusBanner shop={shop} onChange={setShop} onFix={() => router.push('/owner/settings')} />
 
         <Card style={{ gap: 14 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
@@ -167,14 +171,16 @@ function Dashboard() {
               <Text style={type.small} numberOfLines={1}>{shop.address}</Text>
             </View>
           </View>
-          <SwitchRow icon="storefront-outline" title="Shop open" subtitle={shop.isOpen ? 'Customers see you as open now' : 'Shown as closed to customers'}
+          <SwitchRow icon="storefront-outline" title="Shop open" subtitle={shop.isOpen ? (live ? 'Customers see you as open now' : 'Will show as open once approved') : 'Shown as closed to customers'}
             value={shop.isOpen} busy={toggling === 'isOpen'} onValueChange={() => quickToggle('isOpen')} />
           <SwitchRow icon="bicycle-outline" title="Home delivery" subtitle={shop.homeDelivery ? `Delivering up to ${shop.deliveryRadiusKm} km` : 'Pickup only right now'}
             value={shop.homeDelivery} busy={toggling === 'homeDelivery'} onValueChange={() => quickToggle('homeDelivery')} />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button flex variant="outline" icon="eye-outline" title="Customer view" onPress={() => router.push(`/shop/${shop._id}`)} />
-            <Button flex variant="outline" icon="qr-code-outline" title="QR poster" onPress={() => router.push('/owner/poster')} />
-          </View>
+          {live && (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Button flex variant="outline" icon="eye-outline" title="Customer view" onPress={() => router.push(`/shop/${shop._id}`)} />
+              <Button flex variant="outline" icon="qr-code-outline" title="QR poster" onPress={() => router.push('/owner/poster')} />
+            </View>
+          )}
         </Card>
 
         {week && (
@@ -206,7 +212,7 @@ function Dashboard() {
           </Pressable>
         )}
 
-        <Pressable onPress={() => router.push('/owner/poster')} accessibilityRole="button" accessibilityLabel="Print your shop QR poster"
+        {live && <Pressable onPress={() => router.push('/owner/poster')} accessibilityRole="button" accessibilityLabel="Print your shop QR poster"
           style={({ pressed }) => [styles.posterCard, pressed && { opacity: 0.9 }]}>
           <View style={styles.posterIcon}><Ionicons name="qr-code" size={26} color={colors.primary} /></View>
           <View style={{ flex: 1 }}>
@@ -214,7 +220,7 @@ function Dashboard() {
             <Text style={type.small}>Stick it at your counter. Customers scan it to see your items and call you.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-        </Pressable>
+        </Pressable>}
 
         <View style={styles.stats}>
           <Stat icon="cube-outline" label="Items listed" value={products.length} color={colors.primary} />

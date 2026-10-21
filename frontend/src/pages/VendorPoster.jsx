@@ -48,6 +48,9 @@ export default function VendorPoster() {
 
   if (error) return <Alert severity="error">{error}</Alert>
   if (!shop) return <CircularProgress />
+  if (shop.status && shop.status !== 'APPROVED') {
+    return <Alert severity="info">Your QR poster will be ready once your shop is approved and live.</Alert>
+  }
   const local = /localhost|127\.0\.0\.1/.test(window.location.hostname)
 
   return (

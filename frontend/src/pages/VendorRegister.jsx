@@ -67,7 +67,7 @@ export default function VendorRegister() {
     try {
       const { data } = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop) })
       login(data.token)
-      notify('Your shop is live! Now add the items you sell.')
+      notify('Shop registered! We’ll review it shortly. Add your items meanwhile.')
       navigate('/vendor')
     } catch (err) {
       const msg = errorMessage(err)

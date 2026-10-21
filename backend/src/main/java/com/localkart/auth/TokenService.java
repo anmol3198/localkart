@@ -28,17 +28,22 @@ public class TokenService {
 
 	/** Signed HS256 token whose subject is the shop id; "ver" must match the shop's current token version. */
 	public String issue(Shop shop) {
-		return issue(shop.getId(), shop.getTokenVersion());
+		return issue(shop.getId(), shop.getTokenVersion(), Role.SHOP_OWNER);
 	}
 
-	public String issue(UUID shopId, int version) {
+	public String issue(com.localkart.admin.Admin admin) {
+		return issue(admin.getId(), admin.getTokenVersion(), admin.getRole());
+	}
+
+	public String issue(UUID subject, int version, Role role) {
 		Instant now = Instant.now();
 		JwtClaimsSet claims = JwtClaimsSet.builder()
 				.issuer("localkart")
-				.subject(shopId.toString())
+				.subject(subject.toString())
 				.issuedAt(now)
 				.expiresAt(now.plus(props.jwt().ttl()))
 				.claim(VERSION_CLAIM, version)
+				.claim(Role.CLAIM, role.name())
 				.build();
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 		return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
