@@ -11,7 +11,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://https-localkart-onrender-com.onrender.com/api",
-        "EXPO_PUBLIC_WEB_URL": "https://localkart.pages.dev"
+        "EXPO_PUBLIC_WEB_URL": "https://localkart.pages.dev",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a"
       }
     },
     "production": {

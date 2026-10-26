@@ -98,7 +98,7 @@ The role is in the login token and checked by the API on every request.
 
 ## Install without an app store (free)
 - **Website as an app (iPhone and Android):** the site has a web app manifest, icons and a service worker (`frontend/public/manifest.webmanifest`, `sw.js`), so phones can add it to the home screen and it opens full-screen. Android/Chrome shows an **Install** button; iPhone visitors get Share → Add to Home Screen steps. Footer link: **Get the app**. The service worker caches only the site's own files; API data, maps and fonts always load live. Bump `VERSION` in `sw.js` if you change its caching.
-- **Android APK:** `cd mobile && npx eas-cli build -p android --profile preview` builds an installable APK on Expo's free plan and prints a download link to share. People tap it and allow "install unknown apps". The `preview` profile uses the live API and website addresses.
+- **Android APK:** `cd mobile && npx eas-cli build -p android --profile preview` builds an installable APK on Expo's free plan and prints a download link to share. People tap it and allow "install unknown apps". The `preview` profile uses the live API and website addresses and includes only ARM code (`armeabi-v7a,arm64-v8a`, what real phones use), which roughly halves the APK. Play Store builds (AAB) are split per phone automatically.
 
 ## Privacy Policy, Terms and account deletion
 - The website has `/privacy` and `/terms` (`frontend/src/pages/Privacy.jsx`, `Terms.jsx`); the app links to them on the website. Contact and Grievance Officer details are in `frontend/src/lib/legal.js`.
