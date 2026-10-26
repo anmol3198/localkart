@@ -35,17 +35,21 @@ Flyway creates the schema (`src/main/resources/db/migration`). For production, b
 | `CORS_ORIGIN` | `*` | comma-separated origin patterns |
 | `SEED` | `true` | demo data, only inserted when the DB is empty |
 
-## Deploy (free tier: Neon + Render + Vercel)
-1. **Database:** create a PostgreSQL database on [Neon](https://neon.tech).
-2. **API:** on [Render](https://render.com), create a Web Service from this repo with root directory `backend` and the Docker runtime (`backend/Dockerfile`). Set these environment variables:
+## Deploy (free tier: Neon + Render + Cloudflare Pages)
+1. **Database:** create a PostgreSQL database on [Neon](https://neon.tech) (use the direct host, not `-pooler`, since Flyway needs it).
+2. **API:** on [Render](https://render.com), create a Web Service from this repo with root directory `backend` and the Docker runtime (`backend/Dockerfile`), health check path `/api/health`. Set these environment variables:
    - `DB_URL` = `jdbc:postgresql://<neon-host>/<db>?sslmode=require`
    - `DB_USER`, `DB_PASSWORD` from Neon
    - `JWT_SECRET` = a random string of at least 32 characters
-   - `CORS_ORIGIN` = your Vercel URL
+   - `CORS_ORIGIN` = your website address, e.g. `https://localkart.pages.dev`
    - `SEED` = `true` to load the demo shops, `false` for a real launch
+   - `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` for the first super admin
 
    Render sets `PORT`, and Flyway creates the tables on first start.
-3. **UI:** on [Vercel](https://vercel.com), import this repo with root directory `frontend` and set `VITE_API_URL` = `https://<render-app>.onrender.com/api`. `frontend/vercel.json` makes page refreshes on routes like `/shop/:id` work.
+3. **Website:** on [Cloudflare Pages](https://pages.cloudflare.com) (Workers & Pages → Create → Pages → Import an existing Git repository): root directory `frontend`, build command `npm run build`, output directory `dist`, and variables `VITE_API_URL` = `https://<render-app>.onrender.com/api` and `NODE_VERSION` = `22`. `frontend/public/_headers` adds the security headers. (Vercel also works: `frontend/vercel.json`.)
+4. **App:** set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WEB_URL` in `mobile/eas.json` to the live addresses, then build with EAS.
+
+Live now: website https://localkart.pages.dev, API https://https-localkart-onrender-com.onrender.com/api.
 
 ## Shop insights (customer activity)
 The website and app report when a customer opens a shop page (`VIEW`) or taps Call, WhatsApp or Directions. Shop owners see the numbers on the dashboard's **Insights** tab (web) and the **Insights** screen (app): totals, the change against the previous period, a day-by-day chart and where customers came from.

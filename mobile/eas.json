@@ -7,7 +7,8 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://YOUR-RENDER-APP.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://https-localkart-onrender-com.onrender.com/api",
+        "EXPO_PUBLIC_WEB_URL": "https://localkart.pages.dev"
       }
     }
   },
