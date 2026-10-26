@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
-import { Alert, Box, Button, CircularProgress, LinearProgress, Link, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, LinearProgress, Link, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material'
 import PersonIcon from '@mui/icons-material/Person'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
@@ -42,6 +42,7 @@ export default function VendorRegister() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [touched, setTouched] = useState({})
+  const [agreed, setAgreed] = useState(false)
   const setAcc = (key) => (e) => setAccount({ ...account, [key]: e.target.value })
   const liveAccount = validateAccount(account)
   const accErr = (key) => errors[key] || (touched[key] ? liveAccount[key] : undefined)
@@ -55,6 +56,7 @@ export default function VendorRegister() {
   const next = async (e) => {
     e.preventDefault()
     const found = validate(step)
+    if (last && !agreed) found.terms = 'Please accept the Terms of Use and Privacy Policy'
     setErrors(found)
     if (Object.keys(found).length) return
     if (!last) {
@@ -65,7 +67,7 @@ export default function VendorRegister() {
     setBusy(true)
     setError('')
     try {
-      const { data } = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop) })
+      const { data } = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop), acceptTerms: agreed })
       login(data.token)
       notify('Shop registered! We’ll review it shortly. Add your items meanwhile.')
       navigate('/vendor')
@@ -123,6 +125,20 @@ export default function VendorRegister() {
             </FormSection>
           )}
           {step > 0 && <ShopForm value={shop} onChange={setShop} errors={errors} sections={SECTIONS[step]} />}
+          {last && (
+            <Box>
+              <FormControlLabel
+                control={<Checkbox checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setErrors((errs) => ({ ...errs, terms: undefined })) }} />}
+                label={<Typography variant="body2">
+                  I own this shop or am authorised to list it, I’m 18 or older, and I agree to the{' '}
+                  <Link component={RouterLink} to="/terms" target="_blank" rel="noopener">Terms of Use</Link> and{' '}
+                  <Link component={RouterLink} to="/privacy" target="_blank" rel="noopener">Privacy Policy</Link>.
+                </Typography>}
+                sx={{ alignItems: 'flex-start', '& .MuiCheckbox-root': { mt: -0.75 } }}
+              />
+              {errors.terms && <FormHelperText error sx={{ ml: 4 }}>{errors.terms}</FormHelperText>}
+            </Box>
+          )}
 
           <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between' }}>
             {step > 0 ? <Button onClick={back} startIcon={<ArrowBackIcon />} size="large">Back</Button> : <span />}

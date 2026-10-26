@@ -2,6 +2,7 @@ package com.localkart.auth;
 
 import com.localkart.shop.ShopRequest;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -26,6 +27,10 @@ public class RegisterRequest extends ShopRequest {
 	@NotBlank(message = "Password is required")
 	@Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)\\S.{6,70}\\S$", message = "Password must be 8-72 characters with at least one letter and one number")
 	private String password;
+
+	// A primitive, so a request that leaves it out is rejected too.
+	@AssertTrue(message = "Please accept the Terms of Use and Privacy Policy")
+	private boolean acceptTerms;
 
 	/** Practical email check: no spaces, no double dots, a real-looking domain with a 2+ letter ending. */
 	public static final String EMAIL = "^(?!.*\\.\\.)[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}[A-Za-z0-9])?@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,24}$";

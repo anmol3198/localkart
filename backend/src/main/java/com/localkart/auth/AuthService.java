@@ -45,6 +45,8 @@ public class AuthService {
 		// New shops wait for LocalKart staff to check them before customers can see them.
 		shop.setStatus(com.localkart.shop.ShopStatus.PENDING);
 		shop.setSubmittedAt(java.time.Instant.now());
+		shop.setTermsAcceptedAt(shop.getSubmittedAt());
+		shop.setTermsVersion(Legal.TERMS_VERSION);
 		shop = shops.saveAndFlush(shop);
 		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
 	}
@@ -89,6 +91,20 @@ public class AuthService {
 		shop.setTokenVersion(shop.getTokenVersion() + 1);
 		shop = shops.saveAndFlush(shop);
 		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));
+	}
+
+	/** Permanently deletes the shop, its items and its activity. Needs the password, so a stolen session alone can't do it. */
+	@Transactional
+	public void deleteAccount(java.util.UUID shopId, DeleteAccountRequest req) {
+		Shop shop = shops.findById(shopId).orElseThrow(() -> ApiException.notFound("Shop not found"));
+		attempts.check(shop.getEmail());
+		if (!passwordEncoder.matches(req.password(), shop.getPasswordHash())) {
+			attempts.recordFailure(shop.getEmail());
+			throw ApiException.badRequest("Password is incorrect");
+		}
+		attempts.recordSuccess(shop.getEmail());
+		// Items and activity events go with it (ON DELETE CASCADE); every login token stops working.
+		shops.delete(shop);
 	}
 
 	private static String normalize(String email) {

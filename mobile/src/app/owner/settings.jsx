@@ -7,6 +7,7 @@ import { useToast } from '../../lib/toast.jsx'
 import { cleanShop, shopToForm, validateShop } from '../../lib/shop.js'
 import { colors } from '../../lib/theme.js'
 import { Banner, Button } from '../../components/ui.jsx'
+import LegalLinks from '../../components/LegalLinks.jsx'
 import ShopForm from '../../components/ShopForm.jsx'
 
 export default function SettingsScreen() {
@@ -51,6 +52,7 @@ export default function SettingsScreen() {
         {error ? <Banner kind="error">{error}</Banner> : null}
         <ShopForm value={form} onChange={setForm} errors={errors} />
         <Button variant="outline" icon="lock-closed-outline" title="Password & security" iconRight="chevron-forward" onPress={() => router.push('/owner/security')} />
+        <LegalLinks />
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         {dirty ? (

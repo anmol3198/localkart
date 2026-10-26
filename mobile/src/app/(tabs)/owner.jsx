@@ -12,6 +12,7 @@ import { Banner, Button, Card, Chip, EmptyState, IconButton, SwitchRow } from '.
 import { CategoryIcon, OpenBadge } from '../../components/shopBits.jsx'
 import { Delta } from '../../components/InsightsBits.jsx'
 import ShopStatusBanner from '../../components/ShopStatusBanner.jsx'
+import LegalLinks from '../../components/LegalLinks.jsx'
 import { nf } from '../../lib/insights.js'
 
 const PERKS = [
@@ -40,6 +41,7 @@ function Welcome() {
       <View style={{ padding: 16, gap: 12 }}>
         <Button size="lg" icon="add-circle-outline" title="Register your shop — it's free" onPress={() => router.push('/owner/register')} />
         <Button size="lg" variant="outline" icon="log-in-outline" title="I already have an account" onPress={() => router.push('/owner/login')} />
+        <LegalLinks />
       </View>
     </ScrollView>
   )

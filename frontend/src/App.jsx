@@ -6,12 +6,15 @@ import { Link as RouterLink } from 'react-router-dom'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
 import EmptyState from './components/EmptyState.jsx'
+import InstallPrompt from './components/InstallPrompt.jsx'
 import Home from './pages/Home.jsx'
 import ShopPage from './pages/ShopPage.jsx'
 import VendorLogin from './pages/VendorLogin.jsx'
 import VendorRegister from './pages/VendorRegister.jsx'
 import VendorDashboard from './pages/VendorDashboard.jsx'
 import VendorPoster from './pages/VendorPoster.jsx'
+import Privacy from './pages/Privacy.jsx'
+import Terms from './pages/Terms.jsx'
 import { useAuth } from './lib/auth.jsx'
 import AdminApp from './admin/AdminApp.jsx'
 
@@ -60,11 +63,14 @@ export default function App() {
             <Route path="/vendor/register" element={<GuestOnly><VendorRegister /></GuestOnly>} />
             <Route path="/vendor" element={<VendorOnly><VendorDashboard /></VendorOnly>} />
             <Route path="/vendor/poster" element={<VendorOnly><VendorPoster /></VendorOnly>} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Container>
       </Box>
       <Footer />
+      <InstallPrompt />
     </Box>
   )
 }

@@ -63,6 +63,9 @@ class LocalkartApiApplicationTests {
 	@Autowired
 	MockMvc mvc;
 
+	@Autowired
+	org.springframework.jdbc.core.JdbcTemplate jdbc;
+
 	@Test
 	void nearbyReturnsOnlyShopsWithin5KmNearestFirst() throws Exception {
 		mvc.perform(get("/api/shops/nearby?" + HERE))
@@ -122,7 +125,7 @@ class LocalkartApiApplicationTests {
 	@Test
 	void vendorRegistersManagesInventoryAndAppearsNearby() throws Exception {
 		String body = """
-				{"ownerName":"Test Owner","email":"New.Vendor@Example.com","password":"secret12",
+				{"ownerName":"Test Owner","email":"New.Vendor@Example.com","password":"secret12","acceptTerms":true,
 				 "shopName":"Corner Bakery","phone":"9000000001","address":"Main Road","category":"Dairy & Bakery",
 				 "homeDelivery":true,"deliveryRadiusKm":1,"lat":12.9400,"lng":77.6245}""";
 		String token = JsonPath.read(mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
@@ -192,7 +195,7 @@ class LocalkartApiApplicationTests {
 
 	private String registerPendingShop(String email) throws Exception {
 		String body = """
-				{"ownerName":"Insights Owner","email":"%s","password":"secret12",
+				{"ownerName":"Insights Owner","email":"%s","password":"secret12","acceptTerms":true,
 				 "shopName":"Insights Store","phone":"9000000009","address":"Test Road","lat":13.3000,"lng":77.9000}"""
 				.formatted(email);
 		return JsonPath.read(mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
@@ -403,7 +406,7 @@ class LocalkartApiApplicationTests {
 	private static String signup(String overrides) {
 		// a valid registration, with some fields replaced
 		String base = """
-				"ownerName":"Asha Rao","email":"asha%d@example.com","password":"secret12","shopName":"Asha Stores",
+				"ownerName":"Asha Rao","email":"asha%d@example.com","password":"secret12","acceptTerms":true,"shopName":"Asha Stores",
 				"phone":"9876543210","address":"12 MG Road, Indiranagar","lat":12.97,"lng":77.64""".formatted(System.nanoTime());
 		return "{" + base + (overrides.isEmpty() ? "" : "," + overrides) + "}";
 	}
@@ -438,7 +441,7 @@ class LocalkartApiApplicationTests {
 	void phoneAndEmailAreCleanedUp() throws Exception {
 		String email = "  Priya.Shop" + System.nanoTime() + "@Gmail.COM ";
 		register("""
-				{"ownerName":"  Priya   Nair ","email":"%s","password":"secret12","shopName":"Priya Mart",
+				{"ownerName":"  Priya   Nair ","email":"%s","password":"secret12","acceptTerms":true,"shopName":"Priya Mart",
 				 "phone":"+91 98765-43211","alternatePhone":"080 2345 6789","address":"5 Church Street","lat":12.97,"lng":77.60}"""
 				.formatted(email))
 				.andExpect(status().isCreated())
@@ -525,6 +528,39 @@ class LocalkartApiApplicationTests {
 		mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"email\":\"sessions.owner@example.com\",\"password\":\"secret12\"}"))
 				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void signupNeedsConsentToTheTerms() throws Exception {
+		String noConsent = signup("").replace("\"acceptTerms\":true,", "");
+		register(noConsent).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Terms of Use and Privacy Policy")));
+		register(signup("\"acceptTerms\":false")).andExpect(status().isBadRequest());
+		Integer saved = jdbc.queryForObject("SELECT count(*) FROM shops WHERE terms_accepted_at IS NOT NULL AND terms_version = ?",
+				Integer.class, com.localkart.auth.Legal.TERMS_VERSION);
+		org.assertj.core.api.Assertions.assertThat(saved).isPositive();
+	}
+
+	@Test
+	void ownerCanDeleteTheirShopWithPassword() throws Exception {
+		String token = "Bearer " + registerShop("delete.me@example.com");
+		mvc.perform(post("/api/vendor/products").header("Authorization", token).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"name\":\"Rice 1kg\",\"price\":60}")).andExpect(status().isCreated());
+		String del = "/api/vendor/account/delete";
+		mvc.perform(post(del).contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"secret12\"}"))
+				.andExpect(status().isUnauthorized());
+		mvc.perform(post(del).header("Authorization", token).contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"\"}"))
+				.andExpect(status().isBadRequest());
+		mvc.perform(post(del).header("Authorization", token).contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"wrong1234\"}"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Password is incorrect"));
+		mvc.perform(post(del).header("Authorization", token).contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"secret12\"}"))
+				.andExpect(status().isNoContent());
+		// gone: the token stops working, the email can't log in, and items went with the shop
+		mvc.perform(get("/api/vendor/shop").header("Authorization", token)).andExpect(status().isUnauthorized());
+		mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"delete.me@example.com\",\"password\":\"secret12\"}")).andExpect(status().isUnauthorized());
+		org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+				"SELECT count(*) FROM products p LEFT JOIN shops s ON s.id = p.shop_id WHERE s.id IS NULL", Integer.class)).isZero();
 	}
 
 	@Test

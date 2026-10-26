@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -11,6 +11,7 @@ import { EMAIL_MSG, NAME_MSG, PASSWORD_MSG, emailSuggestion, isValidEmail, isVal
 import { colors, type } from '../../lib/theme.js'
 import { Banner, Button, Field, PasswordField, Section } from '../../components/ui.jsx'
 import ShopForm from '../../components/ShopForm.jsx'
+import { openPrivacy, openTerms } from '../../lib/legal.js'
 
 const STEPS = ['Account', 'Shop', 'Location', 'Delivery']
 const SECTIONS = [null, ['details'], ['location'], ['delivery']]
@@ -63,6 +64,7 @@ export default function RegisterScreen() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const last = step === STEPS.length - 1
+  const [agreed, setAgreed] = useState(false)
   const [touched, setTouched] = useState({})
   const setAcc = (key) => (v) => setAccount({ ...account, [key]: v })
   const liveAccount = validateAccount(account)
@@ -74,13 +76,15 @@ export default function RegisterScreen() {
 
   const next = async () => {
     const found = step === 0 ? validateAccount(account) : validateShop(shop, SECTIONS[step])
+    if (last && !agreed) found.terms = 'Please accept the Terms of Use and Privacy Policy'
     setErrors(found)
+    if (found.terms && Object.keys(found).length === 1) return
     if (Object.keys(found).length) return toTop()
     if (!last) { setStep(step + 1); toTop(); return }
     setBusy(true)
     setError('')
     try {
-      const data = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop) })
+      const data = await api.post('/auth/register', { ...account, ownerName: account.ownerName.trim(), email: account.email.trim().toLowerCase(), ...cleanShop(shop), acceptTerms: agreed })
       await login(data.token)
       notify('Shop registered! We’ll review it shortly. Add your items meanwhile.')
       router.dismissTo('/owner')
@@ -124,6 +128,19 @@ export default function RegisterScreen() {
           </Section>
         )}
         {step > 0 && <ShopForm value={shop} onChange={setShop} errors={errors} sections={SECTIONS[step]} />}
+        {last && (
+          <View style={{ gap: 6 }}>
+            <Pressable onPress={() => { setAgreed(!agreed); setErrors({ ...errors, terms: undefined }) }} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}
+              accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
+              <Ionicons name={agreed ? 'checkbox' : 'square-outline'} size={24} color={errors.terms ? colors.danger : agreed ? colors.primary : colors.textMuted} />
+              <Text style={{ flex: 1, color: colors.text, fontSize: 14, lineHeight: 20 }}>
+                I own this shop or am authorised to list it, I’m 18 or older, and I agree to the{' '}
+                <Text style={styles.link} onPress={openTerms}>Terms of Use</Text> and <Text style={styles.link} onPress={openPrivacy}>Privacy Policy</Text>.
+              </Text>
+            </Pressable>
+            {errors.terms ? <Text style={{ color: colors.danger, fontSize: 12, marginLeft: 34 }}>{errors.terms}</Text> : null}
+          </View>
+        )}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         {step > 0 && <Button variant="outline" icon="arrow-back" title="Back" onPress={() => { setErrors({}); setStep(step - 1); toTop() }} />}
@@ -136,5 +153,6 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   dot: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   line: { flex: 1, height: 2, backgroundColor: colors.border },
+  link: { color: colors.primary, fontWeight: '700', textDecorationLine: 'underline' },
   footer: { flexDirection: 'row', gap: 10, padding: 12, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border },
 })

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Alert, Box, Button, CircularProgress, LinearProgress, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Stack, Typography } from '@mui/material'
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
+import { useNavigate } from 'react-router-dom'
 import LockIcon from '@mui/icons-material/Lock'
 import DevicesIcon from '@mui/icons-material/Devices'
 import api, { errorMessage } from '../lib/api.js'
@@ -13,7 +15,7 @@ import ConfirmDialog from './ConfirmDialog.jsx'
 const STRENGTH_COLOR = ['error', 'error', 'warning', 'success', 'success']
 const empty = { currentPassword: '', newPassword: '', confirm: '' }
 
-/** Change password and sign out other devices. Both replace this device's token with a fresh one. */
+/** Change password, sign out other devices, or delete the shop. The first two replace this device's token with a fresh one. */
 export default function SecuritySettings() {
   const { login } = useAuth()
   const notify = useNotify()
@@ -99,10 +101,70 @@ export default function SecuritySettings() {
             Log out other devices
           </Button>
         </Stack>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, pt: 2.5, borderTop: 1, borderColor: 'divider' }}>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Delete my shop</Typography>
+            <Typography variant="body2" color="text.secondary">Permanently removes your shop, all items and activity numbers. This can’t be undone.</Typography>
+          </Box>
+          <DeleteShopButton />
+        </Stack>
       </Stack>
       <ConfirmDialog open={confirmOpen} title="Log out of all other devices?" danger confirmLabel="Log them out" onConfirm={logoutOthers} onClose={() => setConfirmOpen(false)}>
         Every other phone, tablet or browser will need to log in again with your password.
       </ConfirmDialog>
     </FormSection>
+  )
+}
+
+/** Deletes the shop after the owner re-enters their password. */
+function DeleteShopButton() {
+  const { logout } = useAuth()
+  const notify = useNotify()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const close = () => { if (!busy) { setOpen(false); setPassword(''); setError('') } }
+
+  const remove = async (e) => {
+    e.preventDefault()
+    if (!password) return setError('Enter your password to confirm')
+    setBusy(true)
+    try {
+      await api.post('/vendor/account/delete', { password })
+      // Leave the owner-only page first, so its login guard doesn't redirect to the login form.
+      navigate('/', { replace: true })
+      logout()
+      notify('Your shop has been deleted')
+    } catch (err) {
+      setError(errorMessage(err))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Button variant="contained" color="error" startIcon={<DeleteForeverIcon />} onClick={() => setOpen(true)} sx={{ flexShrink: 0 }}>Delete my shop</Button>
+      <Dialog open={open} onClose={close} maxWidth="xs" fullWidth>
+        <Box component="form" onSubmit={remove} noValidate>
+          <DialogTitle>Delete your shop for good?</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Your shop disappears from LocalKart straight away, and your account, items and activity numbers are deleted. You can’t undo this. To list the shop again you’d need to register again.
+              </Typography>
+              <PasswordField label="Your password" autoFocus autoComplete="current-password" value={password}
+                onChange={(e) => { setPassword(e.target.value); setError('') }} error={Boolean(error)} helperText={error} />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={close} disabled={busy}>Keep my shop</Button>
+            <Button type="submit" variant="contained" color="error" disabled={busy} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <DeleteForeverIcon />}>Delete shop</Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </>
   )
 }

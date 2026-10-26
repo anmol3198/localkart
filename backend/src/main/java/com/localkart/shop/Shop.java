@@ -64,6 +64,10 @@ public class Shop {
 	private String reviewedBy;
 	private Instant submittedAt;
 
+	// Consent to the Terms and Privacy Policy at sign-up
+	private Instant termsAcceptedAt;
+	private String termsVersion;
+
 	public boolean isApproved() {
 		return status == ShopStatus.APPROVED;
 	}

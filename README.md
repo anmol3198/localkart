@@ -96,6 +96,15 @@ The role is in the login token and checked by the API on every request.
 - Dependabot (`.github/dependabot.yml`) proposes library updates; turn on Dependabot alerts and security updates in the GitHub repo settings.
 - Not yet: password reset (needs email/SMS, planned with phone OTP), admin approval of new shops, and monitoring/alerting.
 
+## Install without an app store (free)
+- **Website as an app (iPhone and Android):** the site has a web app manifest, icons and a service worker (`frontend/public/manifest.webmanifest`, `sw.js`), so phones can add it to the home screen and it opens full-screen. Android/Chrome shows an **Install** button; iPhone visitors get Share → Add to Home Screen steps. Footer link: **Get the app**. The service worker caches only the site's own files; API data, maps and fonts always load live. Bump `VERSION` in `sw.js` if you change its caching.
+- **Android APK:** `cd mobile && npx eas-cli build -p android --profile preview` builds an installable APK on Expo's free plan and prints a download link to share. People tap it and allow "install unknown apps". The `preview` profile uses the live API and website addresses.
+
+## Privacy Policy, Terms and account deletion
+- The website has `/privacy` and `/terms` (`frontend/src/pages/Privacy.jsx`, `Terms.jsx`); the app links to them on the website. Contact and Grievance Officer details are in `frontend/src/lib/legal.js`.
+- Sign-up requires accepting both: the API rejects registrations without `acceptTerms: true` and stores when and which version was accepted (`terms_accepted_at`, `terms_version`). When the documents change, update `LAST_UPDATED` in `legal.js` and `Legal.TERMS_VERSION` in the API.
+- Shop owners can delete their shop (account, items and activity) under **Shop settings → Password & security**, after re-entering their password (`POST /api/vendor/account/delete`). App stores require in-app account deletion.
+
 ## Tests
 ```bash
 cd backend && ./mvnw test

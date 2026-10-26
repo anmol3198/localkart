@@ -12,14 +12,16 @@ import { Banner, Button, PasswordField, Section } from '../../components/ui.jsx'
 const STRENGTH_COLOR = [colors.danger, colors.danger, colors.warning, colors.success, colors.success]
 const empty = { currentPassword: '', newPassword: '', confirm: '' }
 
-/** Change password and sign out other devices. Both give this device a fresh login token. */
+/** Change password, sign out other devices, or delete the shop. The first two give this device a fresh login token. */
 export default function SecurityScreen() {
-  const { login } = useAuth()
+  const { login, logout } = useAuth()
   const notify = useToast()
   const [form, setForm] = useState(empty)
   const [errors, setErrors] = useState({})
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const set = (key) => (v) => { setForm({ ...form, [key]: v }); setErrors({ ...errors, [key]: undefined }); setError('') }
   const strength = passwordStrength(form.newPassword)
 
@@ -60,6 +62,21 @@ export default function SecurityScreen() {
     }
   }
 
+  const deleteShop = async () => {
+    if (!deletePassword) return setDeleteError('Enter your password to confirm')
+    if (!(await confirm('Delete your shop for good?', 'Your shop disappears from LocalKart straight away, and your account, items and activity numbers are deleted. You can’t undo this.', 'Delete shop'))) return
+    setBusy('delete')
+    try {
+      await api.post('/vendor/account/delete', { password: deletePassword })
+      router.dismissTo('/owner')
+      await logout()
+      notify('Your shop has been deleted')
+    } catch (e) {
+      setDeleteError(e.message)
+      setBusy('')
+    }
+  }
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} keyboardShouldPersistTaps="handled">
@@ -82,6 +99,12 @@ export default function SecurityScreen() {
         <Section icon="phone-portrait-outline" title="Other devices" subtitle="Lost a phone or logged in somewhere else?">
           <Text style={type.muted}>Log out everywhere except this phone. You stay logged in here.</Text>
           <Button variant="outline" icon="log-out-outline" title="Log out other devices" loading={busy === 'logout'} onPress={logoutOthers} />
+        </Section>
+
+        <Section icon="trash-outline" title="Delete my shop" subtitle="Permanently removes your shop, items and activity numbers">
+          <Text style={type.muted}>This can’t be undone. To list the shop again you’d need to register again.</Text>
+          <PasswordField label="Your password" value={deletePassword} onChangeText={(v) => { setDeletePassword(v); setDeleteError('') }} autoComplete="current-password" error={deleteError} />
+          <Button variant="danger" icon="trash" title="Delete my shop" loading={busy === 'delete'} onPress={deleteShop} />
         </Section>
       </ScrollView>
     </KeyboardAvoidingView>
