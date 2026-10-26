@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Pattern;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record EventRequest(
 		@NotBlank(message = "Event type is required")
-		@Pattern(regexp = "(?i)VIEW|CALL|WHATSAPP|DIRECTIONS", message = "Event type must be VIEW, CALL, WHATSAPP or DIRECTIONS") String type,
+		@Pattern(regexp = "(?i)VIEW|CALL|WHATSAPP|DIRECTIONS|ORDER", message = "Event type must be VIEW, CALL, WHATSAPP, DIRECTIONS or ORDER") String type,
 		@Pattern(regexp = "(?i)WEB|ANDROID|IOS", message = "Source must be WEB, ANDROID or IOS") String source,
 		@Pattern(regexp = "^[A-Za-z0-9-]{8,64}$", message = "Invalid visitor id") String visitorId) {
 }

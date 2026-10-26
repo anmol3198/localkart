@@ -28,6 +28,11 @@ import CallButtons from '../components/CallButtons.jsx'
 import CategoryAvatar from '../components/CategoryAvatar.jsx'
 import OpenBadge from '../components/OpenBadge.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import OrderCart, { CartBar } from '../components/OrderCart.jsx'
+import QtyStepper from '../components/QtyStepper.jsx'
+import { useCart } from '../lib/cart.js'
+import { addItem, money, setQty } from '../lib/order.js'
+import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart'
 
 const slug = (s) => `cat-${s.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
@@ -59,6 +64,9 @@ export default function ShopPage() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
   const [inStockOnly, setInStockOnly] = useState(false)
+  const [cart, setCart, clearCart] = useCart(id)
+  const [cartOpen, setCartOpen] = useState(false)
+  const inCart = Object.keys(cart.items).length > 0
   useTitle(data?.shop.shopName)
 
   // One view per visit; the API also ignores repeats from the same device for 30 minutes.
@@ -108,7 +116,7 @@ export default function ShopPage() {
   const jump = (cat) => document.getElementById(slug(cat))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   return (
-    <Stack spacing={2.5} sx={{ pb: { xs: 10, md: 0 } }}>
+    <Stack spacing={2.5} sx={{ pb: { xs: 10, md: inCart ? 12 : 0 } }}>
       <Button component={RouterLink} to="/" startIcon={<ArrowBackIcon />} sx={{ alignSelf: 'flex-start', ml: -1 }}>All nearby shops</Button>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 340px' }, gap: 2.5, alignItems: 'start' }}>
@@ -170,7 +178,7 @@ export default function ShopPage() {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}>
           <Box>
             <Typography variant="h5" component="h2">What's available</Typography>
-            <Typography variant="body2" color="text.secondary">{inStock} of {products.length} items in stock · call to confirm before visiting</Typography>
+            <Typography variant="body2" color="text.secondary">{inStock} of {products.length} items in stock · tap <b>Add</b> to build an order and send it on WhatsApp</Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <TextField
@@ -221,9 +229,12 @@ export default function ShopPage() {
                     {!p.inStock && <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>Out of stock</Typography>}
                   </Box>
                   <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: p.inStock ? 'text.primary' : 'text.secondary' }}>₹{p.price}</Typography>
+                    <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', color: p.inStock ? 'text.primary' : 'text.secondary' }}>{money(p.price)}</Typography>
                     <Typography variant="caption" color="text.secondary">per {p.unit}</Typography>
                   </Box>
+                  {p.inStock && (cart.items[p._id]
+                    ? <QtyStepper qty={cart.items[p._id].qty} label={p.name} onChange={(q) => setCart(setQty(cart, p._id, q))} />
+                    : <Button size="small" variant="outlined" startIcon={<AddShoppingCartIcon fontSize="small" />} onClick={() => setCart(addItem(cart, p))} aria-label={`Add ${p.name} to order`} sx={{ flexShrink: 0 }}>Add</Button>)}
                 </Paper>
               ))}
             </Box>
@@ -232,9 +243,14 @@ export default function ShopPage() {
       </Card>
 
       {/* Phones: keep the order buttons within thumb reach */}
-      <Paper elevation={8} sx={{ display: { xs: 'block', md: 'none' }, position: 'fixed', left: 0, right: 0, bottom: 0, p: 1.5, zIndex: 1100, borderRadius: '16px 16px 0 0' }}>
-        <CallButtons shop={shop} fullWidth />
-      </Paper>
+      {inCart ? (
+        <CartBar cart={cart} shop={shop} onOpen={() => setCartOpen(true)} />
+      ) : (
+        <Paper elevation={8} sx={{ display: { xs: 'block', md: 'none' }, position: 'fixed', left: 0, right: 0, bottom: 0, p: 1.5, zIndex: 1100, borderRadius: '16px 16px 0 0' }}>
+          <CallButtons shop={shop} fullWidth />
+        </Paper>
+      )}
+      <OrderCart open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} setCart={setCart} clear={clearCart} shop={shop} location={location} onFresh={setData} />
     </Stack>
   )
 }

@@ -246,9 +246,11 @@ class LocalkartApiApplicationTests {
 		event(shopId, "{\"type\":\"WHATSAPP\",\"source\":\"IOS\",\"visitorId\":\"visitor-cccc-3333\"}").andExpect(status().isAccepted());
 		// no visitor id: falls back to the client's IP + user agent
 		event(shopId, "{\"type\":\"DIRECTIONS\"}").andExpect(status().isAccepted());
+		// an order sent from the cart
+		event(shopId, "{\"type\":\"ORDER\",\"source\":\"ANDROID\",\"visitorId\":\"visitor-dddd-4444\"}").andExpect(status().isAccepted());
 
 		event(shopId, "{\"type\":\"LIKE\"}").andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.message").value("Event type must be VIEW, CALL, WHATSAPP or DIRECTIONS"));
+				.andExpect(jsonPath("$.message").value("Event type must be VIEW, CALL, WHATSAPP, DIRECTIONS or ORDER"));
 		event(shopId, "{}").andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.message").value("Event type is required"));
 		event(shopId, "{\"type\":\"CALL\",\"source\":\"FAX\"}").andExpect(status().isBadRequest())
@@ -267,12 +269,13 @@ class LocalkartApiApplicationTests {
 				.andExpect(jsonPath("$.totals.calls").value(1))
 				.andExpect(jsonPath("$.totals.whatsapp").value(1))
 				.andExpect(jsonPath("$.totals.directions").value(1))
-				.andExpect(jsonPath("$.totals.contacts").value(2))
+				.andExpect(jsonPath("$.totals.orders").value(1))
+				.andExpect(jsonPath("$.totals.contacts").value(3))
 				.andExpect(jsonPath("$.previous.views").value(0))
 				.andExpect(jsonPath("$.daily.length()").value(7))
 				.andExpect(jsonPath("$.daily[6].views").value(2))
 				.andExpect(jsonPath("$.sources.web").value(2))
-				.andExpect(jsonPath("$.sources.android").value(2))
+				.andExpect(jsonPath("$.sources.android").value(3))
 				.andExpect(jsonPath("$.sources.ios").value(1));
 	}
 

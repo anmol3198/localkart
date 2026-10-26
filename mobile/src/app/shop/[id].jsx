@@ -11,6 +11,10 @@ import { colors, radius, type } from '../../lib/theme.js'
 import { useToast } from '../../lib/toast.jsx'
 import { track } from '../../lib/track.js'
 import { formatPhone } from '../../lib/validation.js'
+import { useCart } from '../../lib/cart.js'
+import { addItem, money, setQty } from '../../lib/order.js'
+import OrderSheet, { CartBar } from '../../components/OrderSheet.jsx'
+import QtyStepper from '../../components/QtyStepper.jsx'
 import { Banner, Button, Card, Chip, EmptyState, IconButton } from '../../components/ui.jsx'
 import { CallButtons, CategoryIcon, DeliveryTag, OpenBadge } from '../../components/shopBits.jsx'
 
@@ -33,6 +37,9 @@ export default function ShopScreen() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
   const [inStockOnly, setInStockOnly] = useState(false)
+  const [cart, setCart, clearCart] = useCart(id)
+  const [cartOpen, setCartOpen] = useState(false)
+  const inCart = Object.keys(cart.items).length > 0
 
   useEffect(() => { track(id, 'VIEW') }, [id])
 
@@ -108,7 +115,7 @@ export default function ShopScreen() {
         <Card style={{ gap: 12 }}>
           <View>
             <Text style={type.h2}>{"What's available"}</Text>
-            <Text style={type.muted}>{inStock} of {products.length} items in stock · call to confirm</Text>
+            <Text style={type.muted}>{inStock} of {products.length} items in stock · tap Add to build an order for WhatsApp</Text>
           </View>
           <View style={styles.search}>
             <Ionicons name="search" size={18} color={colors.textMuted} />
@@ -135,18 +142,26 @@ export default function ShopScreen() {
                     {!p.inStock && <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Out of stock</Text>}
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontWeight: '800', fontSize: 16, color: p.inStock ? colors.text : colors.textMuted }}>₹{p.price}</Text>
+                    <Text style={{ fontWeight: '800', fontSize: 16, color: p.inStock ? colors.text : colors.textMuted }}>{money(p.price)}</Text>
                     <Text style={type.small}>per {p.unit}</Text>
                   </View>
+                  {p.inStock && (cart.items[p._id]
+                    ? <QtyStepper qty={cart.items[p._id].qty} label={p.name} onChange={(q) => setCart(setQty(cart, p._id, q))} />
+                    : <Button size="sm" variant="outline" icon="add" title="Add" onPress={() => setCart(addItem(cart, p))} />)}
                 </View>
               ))}
             </View>
           ))}
         </Card>
       </ScrollView>
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>
-        <CallButtons shop={shop} size="lg" />
-      </View>
+      {inCart ? (
+        <CartBar cart={cart} shop={shop} bottom={insets.bottom} onOpen={() => setCartOpen(true)} />
+      ) : (
+        <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>
+          <CallButtons shop={shop} size="lg" />
+        </View>
+      )}
+      <OrderSheet visible={cartOpen} onClose={() => setCartOpen(false)} cart={cart} setCart={setCart} clear={clearCart} shop={shop} location={location} onFresh={setData} />
     </View>
   )
 }

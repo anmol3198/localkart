@@ -194,7 +194,7 @@ function Dashboard() {
               </View>
             </View>
             <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 6 }}>
-              {nf.format(week.totals.contacts)} {week.totals.contacts === 1 ? 'customer' : 'customers'} called or messaged you
+              {nf.format(week.totals.contacts)} {week.totals.contacts === 1 ? 'customer' : 'customers'} reached out
             </Text>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
               {[['eye-outline', 'Views', week.totals.views, week.previous.views], ['call-outline', 'Calls', week.totals.calls, week.previous.calls],

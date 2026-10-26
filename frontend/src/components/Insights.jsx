@@ -15,6 +15,7 @@ import ShareIcon from '@mui/icons-material/Share'
 import TableChartIcon from '@mui/icons-material/TableChart'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
+import ShoppingBagIcon from '@mui/icons-material/ShoppingBag'
 import api, { errorMessage } from '../lib/api.js'
 import { useNotify } from '../lib/notify.jsx'
 import ActivityChart from './ActivityChart.jsx'
@@ -128,7 +129,8 @@ export default function Insights({ shop }) {
   const summary = useMemo(() => {
     if (!data) return null
     const { totals, daily } = data
-    const busiest = daily.reduce((best, d) => (d.calls + d.whatsapp + d.views > best.score ? { d, score: d.calls + d.whatsapp + d.views } : best), { d: null, score: 0 }).d
+    const score = (d) => d.calls + d.whatsapp + (d.orders || 0) + d.views
+    const busiest = daily.reduce((best, d) => (score(d) > best.score ? { d, score: score(d) } : best), { d: null, score: 0 }).d
     return { contactRate: totals.views ? Math.round((totals.contacts / totals.views) * 100) : 0, busiest }
   }, [data])
 
@@ -161,7 +163,7 @@ export default function Insights({ shop }) {
       {error && <Alert severity="error" action={<Button color="inherit" onClick={load}>Retry</Button>}>{error}</Alert>}
       {!data && !error && <LoadingState />}
 
-      {data && t.views + t.calls + t.whatsapp + t.directions === 0 && (
+      {data && t.views + t.calls + t.whatsapp + t.directions + (t.orders || 0) === 0 && (
         <Card>
           <EmptyState
             icon={<InsightsIcon />}
@@ -173,7 +175,7 @@ export default function Insights({ shop }) {
         </Card>
       )}
 
-      {data && t.views + t.calls + t.whatsapp + t.directions > 0 && (
+      {data && t.views + t.calls + t.whatsapp + t.directions + (t.orders || 0) > 0 && (
         <Box sx={{ opacity: fresh ? 1 : 0.55, transition: 'opacity .2s' }}>
           <Stack spacing={2.5}>
             <Card sx={(th) => ({ p: { xs: 2, sm: 2.5 }, color: '#fff', border: 'none', background: `linear-gradient(135deg, ${th.palette.primary.dark}, ${th.palette.primary.main})` })}>
@@ -183,7 +185,7 @@ export default function Insights({ shop }) {
                     {nf.format(t.contacts)} {t.contacts === 1 ? 'customer' : 'customers'} reached out
                   </Typography>
                   <Typography sx={{ opacity: 0.85, mt: 0.5 }}>
-                    by calling or messaging you {periodLabel(days)}, out of {nf.format(t.views)} who viewed your shop.
+                    by calling, messaging or sending an order {periodLabel(days)}, out of {nf.format(t.views)} who viewed your shop.
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={3} sx={{ flexShrink: 0 }}>
@@ -201,10 +203,11 @@ export default function Insights({ shop }) {
               </Stack>
             </Card>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' }, gap: 2 }}>
               <Kpi icon={<VisibilityIcon fontSize="small" />} label="Shop views" value={t.views} before={p.views} days={days} />
               <Kpi icon={<PhoneIcon fontSize="small" />} label="Calls" value={t.calls} before={p.calls} days={days} highlight />
               <Kpi icon={<WhatsAppIcon fontSize="small" />} label="WhatsApp" value={t.whatsapp} before={p.whatsapp} days={days} highlight />
+              <Kpi icon={<ShoppingBagIcon fontSize="small" />} label="Orders sent" value={t.orders ?? 0} before={p.orders ?? 0} days={days} highlight />
               <Kpi icon={<DirectionsIcon fontSize="small" />} label="Directions" value={t.directions} before={p.directions} days={days} />
             </Box>
 
@@ -228,6 +231,7 @@ export default function Insights({ shop }) {
                           <TableCell align="right">Views</TableCell>
                           <TableCell align="right">Calls</TableCell>
                           <TableCell align="right">WhatsApp</TableCell>
+                          <TableCell align="right">Orders</TableCell>
                           <TableCell align="right">Directions</TableCell>
                         </TableRow>
                       </TableHead>
@@ -238,6 +242,7 @@ export default function Insights({ shop }) {
                             <TableCell align="right">{nf.format(d.views)}</TableCell>
                             <TableCell align="right">{nf.format(d.calls)}</TableCell>
                             <TableCell align="right">{nf.format(d.whatsapp)}</TableCell>
+                            <TableCell align="right">{nf.format(d.orders || 0)}</TableCell>
                             <TableCell align="right">{nf.format(d.directions)}</TableCell>
                           </TableRow>
                         ))}

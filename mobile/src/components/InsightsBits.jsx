@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { colors, radius, type } from '../lib/theme.js'
-import { SERIES, change, fmtDay, nf } from '../lib/insights.js'
+import { SERIES, change, contactsOf, fmtDay, nf } from '../lib/insights.js'
 
 /** Change vs previous period with an arrow + words, so it never relies on colour alone. */
 export function Delta({ now, before, compact }) {
@@ -61,7 +61,7 @@ export function Legend() {
  */
 export function DailyBars({ daily, height = 150 }) {
   const [selected, setSelected] = useState(daily.length - 1)
-  const max = Math.max(1, ...daily.map((d) => d.views), ...daily.map((d) => d.calls + d.whatsapp))
+  const max = Math.max(1, ...daily.map((d) => d.views), ...daily.map(contactsOf))
   const sel = daily[Math.min(selected, daily.length - 1)]
   const gap = daily.length > 45 ? 1 : daily.length > 14 ? 2 : 6
   const step = Math.max(1, Math.ceil(daily.length / 6))
@@ -72,12 +72,12 @@ export function DailyBars({ daily, height = 150 }) {
         <Text style={{ fontWeight: '700', color: colors.text }}>{fmtDay(sel.date, { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
         <Text style={type.muted}>
           <Text style={{ fontWeight: '800', color: colors.text }}>{nf.format(sel.views)}</Text> views ·{' '}
-          <Text style={{ fontWeight: '800', color: colors.text }}>{nf.format(sel.calls + sel.whatsapp)}</Text> contacts
+          <Text style={{ fontWeight: '800', color: colors.text }}>{nf.format(contactsOf(sel))}</Text> contacts
         </Text>
       </View>
       <View style={{ height, flexDirection: 'row', alignItems: 'flex-end', gap, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         {daily.map((d, i) => {
-          const contacts = d.calls + d.whatsapp
+          const contacts = contactsOf(d)
           const active = i === selected
           return (
             <Pressable

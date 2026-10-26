@@ -100,7 +100,7 @@ public class InsightsService {
 			Map<EventType, Long> c = byDay.getOrDefault(d, Map.of());
 			c.forEach((t, n) -> sum.merge(t, n, Long::sum));
 			daily.add(new Insights.Day(d, n(c, EventType.VIEW), n(c, EventType.CALL), n(c, EventType.WHATSAPP),
-					n(c, EventType.DIRECTIONS)));
+					n(c, EventType.DIRECTIONS), n(c, EventType.ORDER)));
 		}
 
 		Map<EventType, Long> prev = new EnumMap<>(EventType.class);
@@ -125,7 +125,7 @@ public class InsightsService {
 
 	private static Insights.Totals totals(Map<EventType, Long> c) {
 		return new Insights.Totals(n(c, EventType.VIEW), n(c, EventType.CALL), n(c, EventType.WHATSAPP),
-				n(c, EventType.DIRECTIONS));
+				n(c, EventType.DIRECTIONS), n(c, EventType.ORDER));
 	}
 
 	private String hash(String value) {

@@ -15,7 +15,7 @@ public record AdminShopView(
 		ShopStatus status, String reviewNote, Instant reviewedAt, String reviewedBy, Instant submittedAt,
 		Instant createdAt, Instant updatedAt, long products, Long inStock, Activity activity30d) {
 
-	public record Activity(long views, long calls, long whatsapp, long directions) {
+	public record Activity(long views, long calls, long whatsapp, long directions, long orders) {
 	}
 
 	static AdminShopView of(Shop s, long products, Long inStock, Activity activity) {

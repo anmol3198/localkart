@@ -67,9 +67,11 @@ public class AdminStatsService {
 
 		Timestamp last30 = Timestamp.from(Instant.now().minusSeconds(DAYS * 86400L));
 		Map<String, Long> activity = new LinkedHashMap<>();
-		for (String t : List.of("views", "calls", "whatsapp", "directions")) activity.put(t, 0L);
+		for (String t : List.of("views", "calls", "whatsapp", "directions", "orders")) activity.put(t, 0L);
 		jdbc.query("select type, count(*) from shop_events where created_at >= ? group by type", rs -> {
-			String key = switch (rs.getString(1)) { case "VIEW" -> "views"; case "CALL" -> "calls"; case "WHATSAPP" -> "whatsapp"; default -> "directions"; };
+			String key = switch (rs.getString(1)) {
+				case "VIEW" -> "views"; case "CALL" -> "calls"; case "WHATSAPP" -> "whatsapp"; case "ORDER" -> "orders"; default -> "directions";
+			};
 			activity.put(key, rs.getLong(2));
 		}, last30);
 		// Customers don't have accounts yet, so distinct devices are the best measure of reach.
@@ -78,7 +80,7 @@ public class AdminStatsService {
 		List<TopShop> top = jdbc.query("""
 				select s.id, s.shop_name, s.category,
 				       count(*) filter (where e.type = 'VIEW') as views,
-				       count(*) filter (where e.type in ('CALL', 'WHATSAPP')) as contacts
+				       count(*) filter (where e.type in ('CALL', 'WHATSAPP', 'ORDER')) as contacts
 				from shop_events e join shops s on s.id = e.shop_id
 				where e.created_at >= ?
 				group by s.id, s.shop_name, s.category

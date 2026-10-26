@@ -17,15 +17,15 @@ public record Insights(
 		List<Day> daily,
 		Map<String, Long> sources) {
 
-	public record Totals(long views, long calls, long whatsapp, long directions) {
+	public record Totals(long views, long calls, long whatsapp, long directions, long orders) {
 
-		/** Customers who reached out: calls + WhatsApp messages. */
+		/** Customers who reached out: calls, WhatsApp messages and orders sent from the cart. */
 		@JsonProperty("contacts")
 		public long contacts() {
-			return calls + whatsapp;
+			return calls + whatsapp + orders;
 		}
 	}
 
-	public record Day(LocalDate date, long views, long calls, long whatsapp, long directions) {
+	public record Day(LocalDate date, long views, long calls, long whatsapp, long directions, long orders) {
 	}
 }

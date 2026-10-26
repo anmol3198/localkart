@@ -59,6 +59,12 @@ The website and app report when a customer opens a shop page (`VIEW`) or taps Ca
 - **Scan to add / update:** items can have an optional barcode (unique within a shop). In the app, **Scan** opens the camera: a known item shows a stock switch and Edit; a new product opens Add item with the name filled in when Open Food Facts knows it (coverage of Indian brands is partial, so the owner may type the name once). On the website, scanning with a USB barcode scanner (or typing a code and pressing Enter) in the inventory search does the same. Retail codes (EAN-8/13, UPC-A, GTIN-14) are checked with their check digit, so typos are caught. Set `BARCODE_LOOKUP=false` to turn the outside lookup off.
 - **QR poster:** owners print an A4 poster (website: dashboard → QR poster; app: My Shop → QR poster) whose QR opens their shop page. On the app set `EXPO_PUBLIC_WEB_URL` to the live website address so posters point to it.
 
+## WhatsApp order cart
+Customers tap **Add** on in-stock items, adjust quantities, choose **pickup** or **home delivery**, and send the order to the shop as a ready-made WhatsApp message (website and app). Shops with a landline get "copy order and call" instead.
+- **Checks before sending:** at least one item; delivery only if the shop delivers to the customer's location and the minimum order is met ("Add ₹X more"); a full address for delivery; optional name and note lengths. Just before sending, the latest stock and prices are fetched: removed or out-of-stock items are dropped and price changes are shown, so the customer re-checks before anything is sent.
+- **Privacy:** orders are not stored on LocalKart's servers; the message goes from the customer's WhatsApp to the shop. The cart, name and address are remembered only on the customer's device. LocalKart counts that an order was sent (`ORDER` event), shown to the shop as "Orders sent" in Insights and in the admin dashboard.
+- Payment and delivery are between the customer and the shop.
+
 ## Roles, shop review and the admin area
 | Role | Who | Can |
 |---|---|---|
@@ -115,7 +121,7 @@ If the app outgrows a single city, switch to PostGIS (`geography(Point)` + `ST_D
 | POST | `/api/admin/shops/{id}/approve` · `reject` · `suspend` · `reinstate` (`{"reason"}`) | admin |
 | GET / POST / PUT | `/api/admin/admins`, `/api/admin/admins/{id}/active` | super admin |
 | GET | `/api/vendor/barcode-lookup/{code}` | Bearer (suggested name/section for a retail barcode, from Open Food Facts) |
-| POST | `/api/shops/{id}/events` | public, rate-limited: `{"type", "source", "visitorId"}`: type VIEW, CALL, WHATSAPP or DIRECTIONS; source WEB, ANDROID or IOS |
+| POST | `/api/shops/{id}/events` | public, rate-limited: `{"type", "source", "visitorId"}`: type VIEW, CALL, WHATSAPP, DIRECTIONS or ORDER; source WEB, ANDROID or IOS |
 | GET | `/api/vendor/insights?days=7` (7, 30 or 90) | Bearer (views, calls, WhatsApp, directions: totals, previous period, daily, by source) |
 
 Errors are always `{"message": "..."}`.

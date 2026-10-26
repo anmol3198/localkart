@@ -81,7 +81,7 @@ export default function AdminDashboard() {
         <Tile icon={<BlockIcon />} label="Rejected / suspended" value={s.rejected + s.suspended} tone="#dc2626" />
         <Tile icon={<PeopleIcon />} label="Customers reached" value={a.uniqueVisitors} hint="Different devices that used LocalKart" tone="#4338ca" />
         <Tile icon={<VisibilityIcon />} label="Shop views" value={a.views} tone="#0369a1" />
-        <Tile icon={<PhoneInTalkIcon />} label="Calls + WhatsApp" value={a.calls + a.whatsapp} tone="#b45309" />
+        <Tile icon={<PhoneInTalkIcon />} label="Calls, WhatsApp & orders" value={a.calls + a.whatsapp + (a.orders || 0)} hint={`${nf.format(a.orders || 0)} orders sent from carts`} tone="#b45309" />
         <Tile icon={<Inventory2Icon />} label="Items listed" value={stats.products.total} hint={`${nf.format(stats.products.inStock)} in stock`} />
       </Box>
 
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ '& th': { fontWeight: 700, color: 'text.secondary' } }}>
-                  <TableCell>Shop</TableCell><TableCell>Category</TableCell><TableCell align="right">Views</TableCell><TableCell align="right">Calls + WhatsApp</TableCell>
+                  <TableCell>Shop</TableCell><TableCell>Category</TableCell><TableCell align="right">Views</TableCell><TableCell align="right">Calls, WhatsApp & orders</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

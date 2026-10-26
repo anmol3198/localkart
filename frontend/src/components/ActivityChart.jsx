@@ -32,7 +32,7 @@ function useWidth() {
 export default function ActivityChart({ daily, height = 260 }) {
   const [ref, width] = useWidth()
   const [hover, setHover] = useState(null)
-  const points = useMemo(() => daily.map((d) => ({ date: d.date, views: d.views, contacts: d.calls + d.whatsapp })), [daily])
+  const points = useMemo(() => daily.map((d) => ({ date: d.date, views: d.views, contacts: d.calls + d.whatsapp + (d.orders || 0) })), [daily])
 
   const innerW = Math.max(0, width - PAD.left - PAD.right)
   const innerH = height - PAD.top - PAD.bottom

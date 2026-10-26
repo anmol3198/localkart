@@ -28,7 +28,8 @@ export default function InsightsScreen() {
   const summary = useMemo(() => {
     if (!data) return null
     const t = data.totals
-    const busiest = data.daily.reduce((b, d) => (d.views + d.calls + d.whatsapp > b.score ? { d, score: d.views + d.calls + d.whatsapp } : b), { d: null, score: 0 }).d
+    const score = (d) => d.views + d.calls + d.whatsapp + (d.orders || 0)
+    const busiest = data.daily.reduce((b, d) => (score(d) > b.score ? { d, score: score(d) } : b), { d: null, score: 0 }).d
     return { rate: t.views ? Math.round((t.contacts / t.views) * 100) : 0, busiest }
   }, [data])
 
@@ -76,7 +77,7 @@ export default function InsightsScreen() {
         <View style={{ gap: 16, opacity: fresh ? 1 : 0.55 }}>
           <View style={styles.hero}>
             <Text style={styles.heroTitle}>{nf.format(t.contacts)} {t.contacts === 1 ? 'customer' : 'customers'} reached out</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 15 }}>by calling or messaging you {periodLabel(days)}, out of {nf.format(t.views)} who viewed your shop.</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 15 }}>by calling, messaging or ordering {periodLabel(days)}, out of {nf.format(t.views)} who viewed your shop.</Text>
             <View style={{ flexDirection: 'row', gap: 24, marginTop: 10 }}>
               <View>
                 <Text style={{ fontSize: 26, fontWeight: '800', color: colors.accentLight }}>{summary.rate}%</Text>
@@ -95,6 +96,7 @@ export default function InsightsScreen() {
             <Kpi icon="eye-outline" label="Shop views" value={t.views} before={p.views} />
             <Kpi icon="call-outline" label="Calls" value={t.calls} before={p.calls} highlight />
             <Kpi icon="logo-whatsapp" label="WhatsApp" value={t.whatsapp} before={p.whatsapp} highlight />
+            <Kpi icon="bag-handle-outline" label="Orders sent" value={t.orders || 0} before={p.orders || 0} highlight />
             <Kpi icon="navigate-outline" label="Directions" value={t.directions} before={p.directions} />
           </View>
 

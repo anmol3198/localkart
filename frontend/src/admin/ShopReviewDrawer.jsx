@@ -106,7 +106,7 @@ export default function ShopReviewDrawer({ shopId, onClose, onChanged }) {
           <Row label="Delivery">{shop.homeDelivery ? 'Home delivery' : 'Pickup only'}</Row>
           {shop.description && <Row label="About">{shop.description}</Row>}
           <Row label="Items">{shop.products} listed{shop.inStock != null && ` · ${shop.inStock} in stock`}</Row>
-          {shop.activity30d && <Row label="Last 30 days">{shop.activity30d.views} views · {shop.activity30d.calls + shop.activity30d.whatsapp} calls/WhatsApp</Row>}
+          {shop.activity30d && <Row label="Last 30 days">{shop.activity30d.views} views · {shop.activity30d.calls + shop.activity30d.whatsapp} calls/WhatsApp · {shop.activity30d.orders || 0} orders</Row>}
           <Row label="Submitted">{fmtDate(shop.submittedAt)}</Row>
 
           {shop.status === 'PENDING' && (

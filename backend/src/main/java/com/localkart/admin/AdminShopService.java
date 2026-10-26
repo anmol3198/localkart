@@ -62,7 +62,7 @@ public class AdminShopService {
 				rs -> { byType.put(rs.getString(1), rs.getLong(2)); }, id,
 				java.sql.Timestamp.from(Instant.now().minus(30, ChronoUnit.DAYS)));
 		var activity = new AdminShopView.Activity(byType.getOrDefault("VIEW", 0L), byType.getOrDefault("CALL", 0L),
-				byType.getOrDefault("WHATSAPP", 0L), byType.getOrDefault("DIRECTIONS", 0L));
+				byType.getOrDefault("WHATSAPP", 0L), byType.getOrDefault("DIRECTIONS", 0L), byType.getOrDefault("ORDER", 0L));
 		return AdminShopView.of(s, total == null ? 0 : total, inStock, activity);
 	}
 

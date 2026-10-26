@@ -71,6 +71,7 @@ public class DemoActivitySeeder implements ApplicationRunner {
 					double r = rnd.nextDouble();
 					if (r < 0.16) add(rows, shop, "CALL", source, visitor, day, rnd);
 					else if (r < 0.27) add(rows, shop, "WHATSAPP", source, visitor, day, rnd);
+					else if (r < 0.33) add(rows, shop, "ORDER", source, visitor, day, rnd);
 					if (rnd.nextDouble() < 0.09) add(rows, shop, "DIRECTIONS", source, visitor, day, rnd);
 				}
 			}
