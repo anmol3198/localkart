@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Box, Button, Card, CircularProgress, Stack, TextField, Typography } from '@mui/material'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import adminApi from './adminApi.js'
@@ -12,6 +12,16 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setError('') }
+
+  useEffect(() => {
+    document.title = 'Sign in · LocalKart Admin'
+    // Keep the staff sign-in out of search engines too.
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => meta.remove()
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()

@@ -27,7 +27,6 @@ export default function AdminLayout() {
   const [pending, setPending] = useState(0)
 
   useEffect(() => {
-    document.title = 'LocalKart Admin'
     // Keep the staff area out of search engines.
     const meta = document.createElement('meta')
     meta.name = 'robots'
@@ -48,6 +47,10 @@ export default function AdminLayout() {
     { to: '/admin/audit', label: 'Audit log', icon: <HistoryIcon /> },
     ...(isSuper ? [{ to: '/admin/admins', label: 'Admins', icon: <GroupIcon /> }] : []),
   ]
+  const section = [...nav].reverse().find((n) => pathname === n.to || (!n.end && pathname.startsWith(`${n.to}/`)))?.label
+  useEffect(() => {
+    document.title = section ? `${section} · LocalKart Admin` : 'LocalKart Admin'
+  }, [section])
 
   const menu = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0b2a22', color: '#dfe9e5' }}>
