@@ -43,7 +43,8 @@ Flyway creates the schema (`src/main/resources/db/migration`). For production, b
    - `JWT_SECRET` = a random string of at least 32 characters
    - `CORS_ORIGIN` = your website address, e.g. `https://localkart.pages.dev`
    - `SEED` = `true` to load the demo shops, `false` for a real launch
-   - `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` for the first super admin
+   - `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` for the first super admin (password 10+ characters with letters and numbers)
+   - Forgot the super admin password? Set `SUPER_ADMIN_PASSWORD` to a new one and add `SUPER_ADMIN_RESET_PASSWORD` = `true`, then redeploy. On start-up that account gets the new password, becomes an active super admin again and is signed out everywhere; the reset appears in the audit log. Remove `SUPER_ADMIN_RESET_PASSWORD` afterwards.
 
    Render sets `PORT`, and Flyway creates the tables on first start. The free plan sleeps after 15 idle minutes; Keep it awake with a free pinger such as cron-job.org or UptimeRobot calling `/api/health` every 5–10 minutes; `.github/workflows/keep-api-awake.yml` is only a backup, because GitHub runs free scheduled jobs hours late (change the address in both if the API moves).
 3. **Website:** on [Cloudflare Pages](https://pages.cloudflare.com) (Workers & Pages → Create → Pages → Import an existing Git repository): root directory `frontend`, build command `npm run build`, output directory `dist`, and variables `VITE_API_URL` = `https://<render-app>.onrender.com/api` and `NODE_VERSION` = `22`. `frontend/public/_headers` adds the security headers. (Vercel also works: `frontend/vercel.json`.)

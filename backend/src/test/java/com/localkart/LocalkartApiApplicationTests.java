@@ -66,6 +66,18 @@ class LocalkartApiApplicationTests {
 	@Autowired
 	org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+	@Autowired
+	com.localkart.admin.AdminRepository adminRepo;
+
+	@Autowired
+	org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+	@Autowired
+	com.localkart.admin.AuditService auditService;
+
+	@Autowired
+	org.springframework.transaction.PlatformTransactionManager txManager;
+
 	@Test
 	void nearbyReturnsOnlyShopsWithin5KmNearestFirst() throws Exception {
 		mvc.perform(get("/api/shops/nearby?" + HERE))
@@ -561,6 +573,48 @@ class LocalkartApiApplicationTests {
 				.content("{\"email\":\"delete.me@example.com\",\"password\":\"secret12\"}")).andExpect(status().isUnauthorized());
 		org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
 				"SELECT count(*) FROM products p LEFT JOIN shops s ON s.id = p.shop_id WHERE s.id IS NULL", Integer.class)).isZero();
+	}
+
+	/** Runs the start-up admin step as the server would with these SUPER_ADMIN_* settings. */
+	private void bootstrapAdmin(String email, String password, boolean reset) {
+		var bootstrap = new com.localkart.admin.AdminBootstrap(adminRepo, passwordEncoder, auditService, email, password, "Reset Test", reset);
+		new org.springframework.transaction.support.TransactionTemplate(txManager).executeWithoutResult(t -> bootstrap.run(null));
+	}
+
+	private org.springframework.test.web.servlet.ResultActions adminLogin(String email, String password) throws Exception {
+		return mvc.perform(post("/api/admin/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"));
+	}
+
+	@Test
+	void forgottenSuperAdminPasswordCanBeResetFromServerSettings() throws Exception {
+		String email = "reset.test@localkart.test";
+		bootstrapAdmin(email, "FirstPass2026", false);
+		String oldToken = JsonPath.read(adminLogin(email, "FirstPass2026").andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString(), "$.token");
+
+		// Without the reset flag a different password changes nothing
+		bootstrapAdmin(email, "SecondPass2026", false);
+		adminLogin(email, "SecondPass2026").andExpect(status().isUnauthorized());
+
+		// A weak password is refused even with the flag
+		bootstrapAdmin(email, "short1", true);
+		adminLogin(email, "FirstPass2026").andExpect(status().isOk());
+
+		// Reset: new password works, old one and old sessions don't, and it is audited
+		bootstrapAdmin(email, "SecondPass2026", true);
+		adminLogin(email, "FirstPass2026").andExpect(status().isUnauthorized());
+		adminLogin(email, "SecondPass2026").andExpect(status().isOk());
+		mvc.perform(get("/api/admin/stats").header("Authorization", "Bearer " + oldToken)).andExpect(status().isUnauthorized());
+		org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+				"SELECT count(*) FROM audit_log WHERE action = 'ADMIN_PASSWORD_RESET' AND target_label = ?", Integer.class, email)).isEqualTo(1);
+
+		// Restarting with the flag still set doesn't sign out again or log another reset
+		String newToken = JsonPath.read(adminLogin(email, "SecondPass2026").andReturn().getResponse().getContentAsString(), "$.token");
+		bootstrapAdmin(email, "SecondPass2026", true);
+		mvc.perform(get("/api/admin/stats").header("Authorization", "Bearer " + newToken)).andExpect(status().isOk());
+		org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+				"SELECT count(*) FROM audit_log WHERE action = 'ADMIN_PASSWORD_RESET' AND target_label = ?", Integer.class, email)).isEqualTo(1);
 	}
 
 	@Test

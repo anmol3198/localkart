@@ -10,6 +10,7 @@ const ACTIONS = {
   SHOP_APPROVED: ['Approved shop', 'success'], SHOP_REJECTED: ['Rejected shop', 'error'], SHOP_SUSPENDED: ['Suspended shop', 'error'],
   SHOP_REINSTATED: ['Reinstated shop', 'success'], ADMIN_CREATED: ['Added admin', 'info'], ADMIN_DEACTIVATED: ['Deactivated admin', 'warning'],
   ADMIN_REACTIVATED: ['Reactivated admin', 'info'], PASSWORD_CHANGED: ['Changed password', 'default'],
+  ADMIN_PASSWORD_RESET: ['Password reset from server settings', 'warning'],
 }
 
 export default function AdminAudit() {
