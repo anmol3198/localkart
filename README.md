@@ -45,7 +45,7 @@ Flyway creates the schema (`src/main/resources/db/migration`). For production, b
    - `SEED` = `true` to load the demo shops, `false` for a real launch
    - `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` for the first super admin
 
-   Render sets `PORT`, and Flyway creates the tables on first start. The free plan sleeps after 15 idle minutes; `.github/workflows/keep-api-awake.yml` pings `/api/health` every 10 minutes so customers don't wait for it to wake (change the address there if the API moves).
+   Render sets `PORT`, and Flyway creates the tables on first start. The free plan sleeps after 15 idle minutes; Keep it awake with a free pinger such as cron-job.org or UptimeRobot calling `/api/health` every 5–10 minutes; `.github/workflows/keep-api-awake.yml` is only a backup, because GitHub runs free scheduled jobs hours late (change the address in both if the API moves).
 3. **Website:** on [Cloudflare Pages](https://pages.cloudflare.com) (Workers & Pages → Create → Pages → Import an existing Git repository): root directory `frontend`, build command `npm run build`, output directory `dist`, and variables `VITE_API_URL` = `https://<render-app>.onrender.com/api` and `NODE_VERSION` = `22`. `frontend/public/_headers` adds the security headers. (Vercel also works: `frontend/vercel.json`.)
 4. **App:** set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WEB_URL` in `mobile/eas.json` to the live addresses, then build with EAS.
 
