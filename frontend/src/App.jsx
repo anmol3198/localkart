@@ -43,7 +43,11 @@ function NotFound() {
 }
 
 export default function App() {
-  const { pathname } = useLocation()
+  const { pathname, search, hash } = useLocation()
+  // Every route is lowercase (shop ids too), so /Admin or /Privacy typed by hand still works.
+  if (pathname !== pathname.toLowerCase()) {
+    return <Navigate to={`${pathname.toLowerCase()}${search}${hash}`} replace />
+  }
   // The staff area has its own layout and sign-in.
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return <><ScrollToTop /><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></>

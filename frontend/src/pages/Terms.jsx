@@ -3,7 +3,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import LegalPage from '../components/LegalPage.jsx'
 import { CONTACT_EMAIL, GRIEVANCE_OFFICER } from '../lib/legal.js'
 
-const P = (props) => <Typography paragraph {...props} />
+const P = (props) => <Typography sx={{ mb: 2 }} {...props} />
 const H = ({ children }) => <Typography component="h3">{children}</Typography>
 const Mail = () => <Link href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</Link>
 
