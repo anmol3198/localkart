@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import api from '../../lib/api.js'
 import { useAuth } from '../../lib/auth.jsx'
 import { useToast } from '../../lib/toast.jsx'
@@ -15,6 +15,8 @@ const empty = { currentPassword: '', newPassword: '', confirm: '' }
 /** Change password, sign out other devices, or delete the shop. The first two give this device a fresh login token. */
 export default function SecurityScreen() {
   const { login, logout } = useAuth()
+  // forced: logged in with a temporary password from LocalKart, so only "choose a new password" is shown
+  const forced = useLocalSearchParams().forced === '1'
   const notify = useToast()
   const [form, setForm] = useState(empty)
   const [errors, setErrors] = useState({})
@@ -80,9 +82,10 @@ export default function SecurityScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} keyboardShouldPersistTaps="handled">
-        <Section icon="lock-closed-outline" title="Change password" subtitle="Other devices are logged out when you change it">
+        {forced ? <Banner kind="warning">You logged in with a temporary password from LocalKart. Choose your own password to open your dashboard.</Banner> : null}
+        <Section icon="lock-closed-outline" title={forced ? 'Choose your new password' : 'Change password'} subtitle={forced ? 'Enter the temporary password you were given, then your new one' : 'Other devices are logged out when you change it'}>
           {error ? <Banner kind="error">{error}</Banner> : null}
-          <PasswordField label="Current password" value={form.currentPassword} onChangeText={set('currentPassword')} autoComplete="current-password" error={errors.currentPassword} />
+          <PasswordField label={forced ? 'Temporary password' : 'Current password'} value={form.currentPassword} onChangeText={set('currentPassword')} autoComplete="current-password" error={errors.currentPassword} />
           <PasswordField label="New password" value={form.newPassword} onChangeText={set('newPassword')} autoComplete="new-password" error={errors.newPassword} hint="At least 8 characters, with letters and numbers" />
           {form.newPassword ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -96,16 +99,22 @@ export default function SecurityScreen() {
           <Button icon="lock-closed" title="Change password" loading={busy === 'password'} onPress={changePassword} />
         </Section>
 
-        <Section icon="phone-portrait-outline" title="Other devices" subtitle="Lost a phone or logged in somewhere else?">
-          <Text style={type.muted}>Log out everywhere except this phone. You stay logged in here.</Text>
-          <Button variant="outline" icon="log-out-outline" title="Log out other devices" loading={busy === 'logout'} onPress={logoutOthers} />
-        </Section>
+        {forced ? (
+          <Button variant="ghost" icon="log-out-outline" title="Log out" onPress={async () => { await logout(); router.dismissTo('/owner') }} />
+        ) : (
+          <>
+          <Section icon="phone-portrait-outline" title="Other devices" subtitle="Lost a phone or logged in somewhere else?">
+            <Text style={type.muted}>Log out everywhere except this phone. You stay logged in here.</Text>
+            <Button variant="outline" icon="log-out-outline" title="Log out other devices" loading={busy === 'logout'} onPress={logoutOthers} />
+          </Section>
 
-        <Section icon="trash-outline" title="Delete my shop" subtitle="Permanently removes your shop, items and activity numbers">
-          <Text style={type.muted}>This can’t be undone. To list the shop again you’d need to register again.</Text>
-          <PasswordField label="Your password" value={deletePassword} onChangeText={(v) => { setDeletePassword(v); setDeleteError('') }} autoComplete="current-password" error={deleteError} />
-          <Button variant="danger" icon="trash" title="Delete my shop" loading={busy === 'delete'} onPress={deleteShop} />
-        </Section>
+          <Section icon="trash-outline" title="Delete my shop" subtitle="Permanently removes your shop, items and activity numbers">
+            <Text style={type.muted}>This can’t be undone. To list the shop again you’d need to register again.</Text>
+            <PasswordField label="Your password" value={deletePassword} onChangeText={(v) => { setDeletePassword(v); setDeleteError('') }} autoComplete="current-password" error={deleteError} />
+            <Button variant="danger" icon="trash" title="Delete my shop" loading={busy === 'delete'} onPress={deleteShop} />
+          </Section>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   )

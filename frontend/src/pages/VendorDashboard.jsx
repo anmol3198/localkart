@@ -34,6 +34,7 @@ import EmptyState from '../components/EmptyState.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import Insights from '../components/Insights.jsx'
 import SecuritySettings from '../components/SecuritySettings.jsx'
+import SetNewPassword from '../components/SetNewPassword.jsx'
 import ShopStatusBanner from '../components/ShopStatusBanner.jsx'
 
 const emptyProduct = { name: '', category: '', price: '', unit: 'piece', inStock: true, description: '', barcode: '' }
@@ -434,7 +435,10 @@ export default function VendorDashboard() {
   }, [logout])
 
   const loadProducts = useCallback(
-    () => api.get('/vendor/products').then(({ data }) => setProducts(data)).catch((e) => setError(errorMessage(e))),
+    () => api.get('/vendor/products').then(({ data }) => setProducts(data)).catch((e) => {
+      // On a temporary password the shop must set its own first; that screen loads the items afterwards.
+      if (e.response?.data?.code !== 'PASSWORD_CHANGE_REQUIRED') setError(errorMessage(e))
+    }),
     [],
   )
   useEffect(() => { loadProducts() }, [loadProducts])
@@ -464,6 +468,10 @@ export default function VendorDashboard() {
         <Skeleton variant="rounded" height={300} />
       </Stack>
     )
+  }
+
+  if (shop.mustChangePassword) {
+    return <SetNewPassword shop={shop} onDone={(updated) => { setShop(updated); loadProducts() }} />
   }
 
   const total = products?.length ?? 0

@@ -7,6 +7,7 @@ import { useToast } from '../../lib/toast.jsx'
 import { colors, type } from '../../lib/theme.js'
 import { Banner, Button, Field, PasswordField } from '../../components/ui.jsx'
 import { isValidEmail } from '../../lib/validation.js'
+import { SUPPORT_PHONE, callSupport, whatsappSupport } from '../../lib/legal.js'
 
 export default function LoginScreen() {
   const { login } = useAuth()
@@ -43,6 +44,12 @@ export default function LoginScreen() {
         <Field label="Email" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" autoFocus />
         <PasswordField label="Password" value={form.password} onChangeText={set('password')} autoComplete="current-password" textContentType="password" onSubmitEditing={submit} returnKeyType="go" />
         <Button size="lg" icon="log-in-outline" title={busy ? 'Logging in…' : 'Log in'} loading={busy} onPress={submit} />
+        <Text style={[type.muted, { textAlign: 'center', lineHeight: 20 }]}>
+          Forgot your password?{' '}
+          <Text style={{ color: colors.primary, fontWeight: '800' }} onPress={callSupport} accessibilityRole="link">Call</Text> or{' '}
+          <Text style={{ color: colors.primary, fontWeight: '800' }} onPress={() => whatsappSupport('Hi, I forgot my LocalKart shop password. My login email is: ')} accessibilityRole="link">WhatsApp</Text>{' '}
+          {SUPPORT_PHONE.slice(0, 5)} {SUPPORT_PHONE.slice(5)} and we’ll reset it.
+        </Text>
         {__DEV__ && (
           <Banner kind="info" action={<Text style={{ color: colors.primary, fontWeight: '800' }} onPress={() => setForm({ email: 'shop1@demo.local', password: 'demo1234' })}>Fill in</Text>}>
             Demo: shop1@demo.local / demo1234

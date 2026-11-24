@@ -88,6 +88,7 @@ public class AuthService {
 		}
 		attempts.recordSuccess(shop.getEmail());
 		shop.setPasswordHash(passwordEncoder.encode(req.newPassword()));
+		shop.setMustChangePassword(false);
 		shop.setTokenVersion(shop.getTokenVersion() + 1);
 		shop = shops.saveAndFlush(shop);
 		return new AuthResponse(tokens.issue(shop), ShopView.forOwner(shop));

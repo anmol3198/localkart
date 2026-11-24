@@ -11,6 +11,7 @@ const ACTIONS = {
   SHOP_REINSTATED: ['Reinstated shop', 'success'], ADMIN_CREATED: ['Added admin', 'info'], ADMIN_DEACTIVATED: ['Deactivated admin', 'warning'],
   ADMIN_REACTIVATED: ['Reactivated admin', 'info'], PASSWORD_CHANGED: ['Changed password', 'default'],
   ADMIN_PASSWORD_RESET: ['Password reset from server settings', 'warning'],
+  SHOP_PASSWORD_RESET: ['Gave shop a temporary password', 'warning'],
 }
 
 export default function AdminAudit() {

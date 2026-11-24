@@ -618,6 +618,51 @@ class LocalkartApiApplicationTests {
 	}
 
 	@Test
+	void adminCanIssueTemporaryShopPasswordAndOwnerMustChangeIt() throws Exception {
+		String email = "forgot.owner@example.com";
+		String oldToken = "Bearer " + registerShop(email);
+		String shopId = JsonPath.read(mvc.perform(get("/api/vendor/shop").header("Authorization", oldToken))
+				.andReturn().getResponse().getContentAsString(), "$._id");
+		String reset = "/api/admin/shops/" + shopId + "/reset-password";
+
+		// Owners and anonymous callers can't use it
+		mvc.perform(post(reset)).andExpect(status().isUnauthorized());
+		mvc.perform(post(reset).header("Authorization", oldToken)).andExpect(status().isForbidden());
+
+		String temp = JsonPath.read(mvc.perform(post(reset).header("Authorization", admin()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.shopName").exists())
+				.andReturn().getResponse().getContentAsString(), "$.temporaryPassword");
+		org.assertj.core.api.Assertions.assertThat(temp).matches("[a-z2-9]{10}").containsPattern("[a-z]").containsPattern("[2-9]");
+
+		// Old sessions and the old password stop working; the temporary one logs in, flagged
+		mvc.perform(get("/api/vendor/shop").header("Authorization", oldToken)).andExpect(status().isUnauthorized());
+		mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"" + email + "\",\"password\":\"secret12\"}")).andExpect(status().isUnauthorized());
+		String tempToken = "Bearer " + JsonPath.read(mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"" + email + "\",\"password\":\"" + temp + "\"}"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.shop.mustChangePassword").value(true))
+				.andReturn().getResponse().getContentAsString(), "$.token");
+
+		// Until they choose a password, only reading the shop and changing the password are allowed
+		mvc.perform(get("/api/vendor/shop").header("Authorization", tempToken)).andExpect(status().isOk());
+		mvc.perform(get("/api/vendor/products").header("Authorization", tempToken))
+				.andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+		String fresh = "Bearer " + JsonPath.read(mvc.perform(put("/api/vendor/password").header("Authorization", tempToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"currentPassword\":\"" + temp + "\",\"newPassword\":\"mynewpass9\"}"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.shop.mustChangePassword").value(false))
+				.andReturn().getResponse().getContentAsString(), "$.token");
+		mvc.perform(get("/api/vendor/products").header("Authorization", fresh)).andExpect(status().isOk());
+
+		// Customers never see the flag; the reset is audited without the password
+		mvc.perform(get("/api/shops/" + shopId)).andExpect(jsonPath("$.mustChangePassword").doesNotExist());
+		org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+				"SELECT count(*) FROM audit_log WHERE action = 'SHOP_PASSWORD_RESET' AND target_id = ? AND details NOT LIKE ?",
+				Integer.class, shopId, "%" + temp + "%")).isEqualTo(1);
+	}
+
+	@Test
 	void publicBrowsingIsRateLimitedPerVisitor() throws Exception {
 		for (int i = 0; i < 600; i++) {
 			mvc.perform(get("/api/meta").with(r -> { r.setRemoteAddr("10.2.0.1"); return r; })).andExpect(status().isOk());

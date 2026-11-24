@@ -9,6 +9,8 @@ import useTitle from '../lib/useTitle.js'
 import AuthLayout from '../components/AuthLayout.jsx'
 import { isValidEmail } from '../lib/validation.js'
 import PasswordField from '../components/PasswordField.jsx'
+import { SUPPORT_PHONE } from '../lib/legal.js'
+import { formatPhone } from '../lib/validation.js'
 
 export default function VendorLogin() {
   useTitle('Shop owner login')
@@ -51,6 +53,11 @@ export default function VendorLogin() {
           <Button type="submit" variant="contained" size="large" disabled={busy} startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LoginIcon />}>
             {busy ? 'Logging in…' : 'Log in'}
           </Button>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            Forgot your password? <Link href={`tel:+91${SUPPORT_PHONE}`} sx={{ fontWeight: 600 }}>Call</Link> or{' '}
+            <Link href={`https://wa.me/91${SUPPORT_PHONE}?text=${encodeURIComponent('Hi, I forgot my LocalKart shop password. My login email is: ')}`} target="_blank" rel="noopener" sx={{ fontWeight: 600 }}>WhatsApp</Link>{' '}
+            <b>{formatPhone(SUPPORT_PHONE)}</b> and we’ll reset it.
+          </Typography>
           {import.meta.env.DEV && (
             <Alert severity="info" variant="outlined">
               Demo account: <b>shop1@demo.local</b> / <b>demo1234</b>{' '}

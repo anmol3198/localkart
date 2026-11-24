@@ -16,6 +16,7 @@ import { errorMessage } from '../lib/api.js'
 import { formatPhone } from '../lib/validation.js'
 import { useNotify } from '../lib/notify.jsx'
 import { ReasonDialog, StatusChip, fmtDate } from './bits.jsx'
+import ResetShopPassword from './ResetShopPassword.jsx'
 
 const pin = L.divIcon({ className: 'lk-pin', html: '<div style="background:#0b6e55"><span>●</span></div>', iconSize: [30, 30], iconAnchor: [15, 30] })
 
@@ -118,6 +119,7 @@ export default function ShopReviewDrawer({ shopId, onClose, onChanged }) {
       )}
       {shop && (
         <Stack direction="row" spacing={1} sx={{ p: 2, borderTop: 1, borderColor: 'divider', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ mr: 'auto' }}><ResetShopPassword shop={shop} /></Box>
           {(shop.status === 'PENDING' || shop.status === 'REJECTED') && btn('approve', 'Approve', <CheckIcon />, { variant: 'contained', color: 'success', onClick: () => act('approve') })}
           {shop.status === 'PENDING' && btn('reject', 'Reject', <CloseRoundedIcon />, { variant: 'outlined', color: 'error', onClick: () => setDialog('reject') })}
           {shop.status === 'APPROVED' && btn('suspend', 'Suspend', <BlockIcon />, { variant: 'outlined', color: 'error', onClick: () => setDialog('suspend') })}

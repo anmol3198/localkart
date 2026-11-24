@@ -74,7 +74,14 @@ function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([api.get('/vendor/shop'), api.get('/vendor/products')])
+      const s = await api.get('/vendor/shop')
+      if (s.mustChangePassword) {
+        // Logged in with a temporary password from LocalKart: choose their own before anything else.
+        setShop(s)
+        router.push('/owner/security?forced=1')
+        return
+      }
+      const p = await api.get('/vendor/products')
       setShop(s)
       setProducts(p)
       setError('')

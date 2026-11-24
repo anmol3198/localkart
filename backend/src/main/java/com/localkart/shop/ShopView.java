@@ -39,7 +39,9 @@ public record ShopView(
 		List<ProductView> matchingProducts,
 		// Owner-only: review state and the admin's note (e.g. why it was rejected)
 		ShopStatus status,
-		String reviewNote) {
+		String reviewNote,
+		// Owner-only: true after staff issued a temporary password
+		Boolean mustChangePassword) {
 
 	public record GeoPoint(String type, double[] coordinates) {
 		static GeoPoint of(double lat, double lng) {
@@ -70,6 +72,7 @@ public record ShopView(
 				distanceKm == null ? null : s.deliversWithin(distanceKm),
 				matching,
 				owner ? s.getStatus() : null,
-				owner ? s.getReviewNote() : null);
+				owner ? s.getReviewNote() : null,
+				owner ? s.isMustChangePassword() : null);
 	}
 }

@@ -15,6 +15,9 @@ public interface ShopRepository extends JpaRepository<Shop, UUID> {
 	@org.springframework.data.jpa.repository.Query("select s.tokenVersion from Shop s where s.id = :id")
 	Optional<Integer> findTokenVersion(@org.springframework.data.repository.query.Param("id") UUID id);
 
+	@org.springframework.data.jpa.repository.Query("select s.mustChangePassword from Shop s where s.id = :id")
+	Optional<Boolean> findMustChangePassword(@org.springframework.data.repository.query.Param("id") UUID id);
+
 	List<Shop> findByLatitudeBetweenAndLongitudeBetweenAndStatus(double minLat, double maxLat, double minLng, double maxLng,
 			ShopStatus status);
 

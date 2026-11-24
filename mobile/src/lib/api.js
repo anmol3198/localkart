@@ -21,9 +21,10 @@ export const setApiToken = (t) => { token = t }
 export const getApiToken = () => token
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, code) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -48,7 +49,7 @@ async function request(method, path, { params, body } = {}) {
   const text = await res.text()
   let data = null
   try { data = text ? JSON.parse(text) : null } catch { data = null }
-  if (!res.ok) throw new ApiError(data?.message || `Something went wrong (${res.status})`, res.status)
+  if (!res.ok) throw new ApiError(data?.message || `Something went wrong (${res.status})`, res.status, data?.code)
   return data
 }
 

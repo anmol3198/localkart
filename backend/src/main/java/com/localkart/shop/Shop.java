@@ -75,6 +75,9 @@ public class Shop {
 	/** Incremented to invalidate every login token issued before (log out of all devices). */
 	private int tokenVersion;
 
+	/** Staff issued a temporary password; the owner must set their own before using the dashboard. */
+	private boolean mustChangePassword;
+
 	@CreationTimestamp
 	private Instant createdAt;
 

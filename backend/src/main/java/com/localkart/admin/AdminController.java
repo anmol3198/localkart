@@ -101,6 +101,11 @@ public class AdminController {
 		return shops.reinstate(id, req == null ? null : req.trimmed(), me(jwt));
 	}
 
+	@PostMapping("/shops/{id}/reset-password")
+	public AdminShopService.TemporaryPassword resetShopPassword(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+		return shops.resetPassword(id, me(jwt));
+	}
+
 	@GetMapping("/audit")
 	public AdminShopService.PageResult<AuditEntry> audit(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "30") int size) {
 		var p = audit.recent(page, size);

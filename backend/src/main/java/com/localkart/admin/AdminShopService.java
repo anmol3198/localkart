@@ -10,11 +10,13 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.localkart.auth.LoginAttemptLimiter;
 import com.localkart.common.ApiException;
 import com.localkart.shop.Shop;
 import com.localkart.shop.ShopRepository;
@@ -34,8 +36,18 @@ public class AdminShopService {
 	private final AuditService audit;
 	private final JdbcTemplate jdbc;
 	private final NamedParameterJdbcTemplate named;
+	private final PasswordEncoder passwordEncoder;
+	private final LoginAttemptLimiter attempts;
+	private final java.security.SecureRandom random = new java.security.SecureRandom();
 
-	public AdminShopService(ShopRepository shops, AuditService audit, JdbcTemplate jdbc) {
+	/** Shown once to the admin, who passes it to the owner; never stored or logged in plain text. */
+	public record TemporaryPassword(String temporaryPassword, String shopName, String ownerName, String phone) {
+	}
+
+	public AdminShopService(ShopRepository shops, AuditService audit, JdbcTemplate jdbc, PasswordEncoder passwordEncoder,
+			LoginAttemptLimiter attempts) {
+		this.passwordEncoder = passwordEncoder;
+		this.attempts = attempts;
 		this.shops = shops;
 		this.audit = audit;
 		this.jdbc = jdbc;
@@ -101,6 +113,34 @@ public class AdminShopService {
 			throw ApiException.badRequest("Only suspended shops can be reinstated");
 		}
 		return transition(s, ShopStatus.APPROVED, note, by, "SHOP_REINSTATED");
+	}
+
+	/**
+	 * Forgotten password: gives the owner a one-time temporary password, signs the shop out everywhere and lifts any
+	 * login lockout. The owner must set their own password at the next login.
+	 */
+	@Transactional
+	public TemporaryPassword resetPassword(UUID id, Admin by) {
+		Shop s = get(id);
+		String temp = temporaryPassword();
+		s.setPasswordHash(passwordEncoder.encode(temp));
+		s.setMustChangePassword(true);
+		s.setTokenVersion(s.getTokenVersion() + 1);
+		shops.saveAndFlush(s);
+		attempts.recordSuccess(s.getEmail());
+		audit.log(by, "SHOP_PASSWORD_RESET", "SHOP", s.getId(), s.getShopName(), "Temporary password issued; owner must set a new one");
+		return new TemporaryPassword(temp, s.getShopName(), s.getOwnerName(), s.getPhone());
+	}
+
+	// Easy to read out on a call: no 0/O, 1/l/I. 10 characters, always with letters and digits (meets the password rules).
+	private String temporaryPassword() {
+		String letters = "abcdefghjkmnpqrstuvwxyz", digits = "23456789", all = letters + digits;
+		while (true) {
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < 10; i++) sb.append(all.charAt(random.nextInt(all.length())));
+			String p = sb.toString();
+			if (p.chars().anyMatch(c -> letters.indexOf(c) >= 0) && p.chars().anyMatch(c -> digits.indexOf(c) >= 0)) return p;
+		}
 	}
 
 	private AdminShopView transition(Shop s, ShopStatus to, String note, Admin by, String action) {

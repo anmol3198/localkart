@@ -106,6 +106,9 @@ The role is in the login token and checked by the API on every request.
 - Sign-up requires accepting both: the API rejects registrations without `acceptTerms: true` and stores when and which version was accepted (`terms_accepted_at`, `terms_version`). When the documents change, update `LAST_UPDATED` in `legal.js` and `Legal.TERMS_VERSION` in the API.
 - Shop owners can delete their shop (account, items and activity) under **Shop settings → Password & security**, after re-entering their password (`POST /api/vendor/account/delete`). App stores require in-app account deletion.
 
+## Forgotten shop password
+Shop owners can't reset their own password yet (that needs email or SMS). The login screens show the help line (`SUPPORT_PHONE` in `frontend/src/lib/legal.js` and `mobile/src/lib/legal.js`). Staff open the shop in **Admin → Review queue / All shops → Reset password**, confirm it's the owner by calling the shop's number, and get a one-time temporary password to pass on (Copy, Send on WhatsApp or Call). The shop is logged out everywhere and any lockout is lifted. After logging in with it, the owner must choose their own password: until then the API answers 403 `PASSWORD_CHANGE_REQUIRED` for everything except reading the shop and changing the password. The reset is in the audit log, without the password.
+
 ## Tests
 ```bash
 cd backend && ./mvnw test
